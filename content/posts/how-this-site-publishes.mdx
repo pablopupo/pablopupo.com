@@ -1,0 +1,21 @@
+---
+title: How this site publishes
+date: "2026-07-02"
+description: Posts are MDX files with a draft flag. Publishing is deleting the flag.
+draft: true
+---
+
+Posts on this site are MDX files in `content/posts`. Each one starts with a
+small block of frontmatter, and a `draft: true` flag keeps a post out of the
+writing page, the RSS feed, and the sitemap until it is ready.
+
+```yaml
+---
+title: How this site publishes
+date: "2026-07-02"
+draft: true
+---
+```
+
+Publishing is deleting that flag. This post exists to keep the pipeline
+honest, and it ships with the flag still on.
