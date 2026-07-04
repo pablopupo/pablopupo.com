@@ -9,6 +9,7 @@ export type Post = {
   title: string;
   date: string;
   description?: string;
+  tags: string[];
   content: string;
 };
 
@@ -21,6 +22,7 @@ function readPost(file: string): Post & { draft: boolean } {
     title: data.title,
     date: data.date,
     description: data.description,
+    tags: Array.isArray(data.tags) ? data.tags : [],
     draft: data.draft === true,
     content,
   };

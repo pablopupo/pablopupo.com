@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getPost, getPosts, formatDate } from "@/lib/posts";
+import { renderWikilinks } from "@/lib/wikilinks";
 
 export const dynamicParams = false;
 
@@ -33,7 +34,7 @@ export default async function PostPage({
     <article>
       <h1>{post.title}</h1>
       <time dateTime={post.date}>{formatDate(post.date)}</time>
-      <MDXRemote source={post.content} />
+      <MDXRemote source={renderWikilinks(post.content)} />
     </article>
   );
 }

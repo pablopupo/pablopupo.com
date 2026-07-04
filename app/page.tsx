@@ -1,3 +1,5 @@
+import KnowledgeGraph from "@/components/knowledge-graph";
+
 export default function Home() {
   return (
     <>
@@ -70,6 +72,14 @@ export default function Home() {
           </span>
         </li>
       </ul>
+
+      <h2 className="label">Connections</h2>
+      <p className="graph-note">
+        The work on this site, drawn as one map. I tagged the solid edges by
+        hand; the dashed ones are computed from the text at build time. Hover
+        to explore.
+      </p>
+      <KnowledgeGraph />
     </>
   );
 }

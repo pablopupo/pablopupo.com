@@ -327,7 +327,70 @@ pre code {
   font-size: 0.8125rem;
 }
 
+.graph-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  margin-bottom: 0.875rem;
+}
+
+.graph-wrap {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.graph-wrap canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+}
+
+.graph-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.375rem 1rem;
+  padding: 0.5rem 0.75rem 0.625rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+}
+
+.graph-legend button {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.graph-legend button.off {
+  color: var(--muted);
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.graph-caption {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-height: 1rem;
+  text-align: right;
+  flex: 1;
+}
+
 @media (max-width: 480px) {
+  .graph-caption {
+    text-align: left;
+  }
+
   header nav {
     gap: 1rem;
   }

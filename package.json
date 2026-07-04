@@ -4,9 +4,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "graph": "node scripts/build-graph.mjs",
+    "prebuild": "node scripts/build-graph.mjs"
   },
   "dependencies": {
+    "d3-force": "^3.0.0",
     "gray-matter": "^4.0.3",
     "next": "^16.2.10",
     "next-mdx-remote": "^6.0.0",
@@ -14,6 +17,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@types/d3-force": "^3.0.10",
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
