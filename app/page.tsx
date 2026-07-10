@@ -1,6 +1,9 @@
 import KnowledgeGraph from "@/components/knowledge-graph";
+import { getContributions, shortRef } from "@/lib/contributions";
 
 export default function Home() {
+  const contributions = getContributions();
+
   return (
     <>
       <h1>Pablo Pupo</h1>
@@ -48,30 +51,18 @@ export default function Home() {
 
       <h2 className="label">Recent open source</h2>
       <ul className="prs">
-        <li>
-          <a
-            className="id"
-            href="https://github.com/docling-project/docling/pull/3702"
-          >
-            docling&nbsp;#3702
-          </a>
-          <span className="desc">
-            fix for optional-dependency imports that broke the core converter
-            in slim installs
-          </span>
-        </li>
-        <li>
-          <a
-            className="id"
-            href="https://github.com/docling-project/docling/pull/3721"
-          >
-            docling&nbsp;#3721
-          </a>
-          <span className="desc">
-            code language detection for parsed code blocks
-          </span>
-        </li>
+        {contributions.slice(0, 3).map((c) => (
+          <li key={c.url}>
+            <a className="id" href={c.url}>
+              {shortRef(c)}
+            </a>
+            <span className="desc">{c.title}</span>
+          </li>
+        ))}
       </ul>
+      <p className="more">
+        <a href="/contributions">all {contributions.length} contributions</a>
+      </p>
 
       <h2 className="label">Connections</h2>
       <p className="graph-note">
