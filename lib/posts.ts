@@ -11,7 +11,13 @@ export type Post = {
   description?: string;
   tags: string[];
   content: string;
+  readMinutes: number;
 };
+
+export function readingTime(content: string): number {
+  const words = content.split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 230));
+}
 
 function readPost(file: string): Post & { draft: boolean } {
   const slug = file.replace(/\.mdx$/, "");
@@ -25,6 +31,7 @@ function readPost(file: string): Post & { draft: boolean } {
     tags: Array.isArray(data.tags) ? data.tags : [],
     draft: data.draft === true,
     content,
+    readMinutes: readingTime(content),
   };
 }
 

@@ -33,7 +33,9 @@ export default async function PostPage({
   return (
     <article>
       <h1>{post.title}</h1>
-      <time dateTime={post.date}>{formatDate(post.date)}</time>
+      <time dateTime={post.date}>
+        {formatDate(post.date)} · {post.readMinutes} min read
+      </time>
       <MDXRemote source={renderWikilinks(post.content)} />
     </article>
   );

@@ -23,8 +23,15 @@ export default function Writing() {
         <ul className="posts">
           {posts.map((post) => (
             <li key={post.slug}>
-              <time dateTime={post.date}>{formatDate(post.date)}</time>
-              <Link href={`/writing/${post.slug}`}>{post.title}</Link>
+              <div className="head">
+                <Link href={`/writing/${post.slug}`}>{post.title}</Link>
+              </div>
+              <span className="meta">
+                <time dateTime={post.date}>{formatDate(post.date)}</time>
+                {" · "}
+                {post.readMinutes} min read
+              </span>
+              {post.description && <p className="excerpt">{post.description}</p>}
             </li>
           ))}
         </ul>
