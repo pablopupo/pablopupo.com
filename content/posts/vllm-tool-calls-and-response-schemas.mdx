@@ -1,0 +1,67 @@
+---
+title: Composing tool calls and response schemas in vLLM
+date: "2026-07-10"
+description: vLLM made agents choose between calling tools and getting schema-valid output. The fix is a grammar that accepts either, with one subtle trap in how xgrammar handles triggered tags.
+draft: true
+---
+
+An agent framework that gives a model tools usually also wants the final answer
+in a fixed shape. The OpenAI Agents SDK, for example, sends your `output_type`
+schema as `response_format` on every single turn, alongside the tools. What it
+means is simple. On intermediate turns the model should be free to call a tool,
+and on the last turn the answer should validate against the schema.
+
+vLLM couldn't do both. With `tool_choice="auto"` and a `response_format`, the
+non-strict path constrained the whole output to the JSON schema, so tool calls
+were silently suppressed. The strict path had the opposite failure and dropped
+`response_format` entirely, so the final answer came back unconstrained. That's
+[#39929](https://github.com/vllm-project/vllm/issues/39929). I first shipped a
+near-term fix in [#47439](https://github.com/vllm-project/vllm/pull/47439) that
+stops `response_format` from suppressing tool calls, and then went after the
+real thing in [#48157](https://github.com/vllm-project/vllm/pull/48157), a
+grammar that accepts a tool call or a schema-valid answer and lets the model
+pick per turn.
+
+## The construction
+
+vLLM already has the pieces. Guided decoding goes through xgrammar structural
+tags, and there's a registry of per-model builders that know how each tool
+parser's call format looks on the wire. The obvious move is to take the
+existing auto tool-call grammar and union it with a `JSONSchemaFormat` of the
+response schema.
+
+The trap is in `TriggeredTagsFormat`, the structure the tool branch is built
+from. Its whole design is that content outside a triggered tag is
+unconstrained, which is what you want for a model that writes prose around its
+tool calls. But it means a naive union is broken in a way that every test that
+only checks accepted strings will miss. The triggered-tags branch already
+accepts arbitrary free text, so the schema branch of the union is unreachable
+and the composed grammar degrades to "anything goes".
+
+The fix is to force the tool branch with `at_least_one=True` before the union.
+Now that branch only matches outputs that actually contain a tool call, and the
+top-level `OrFormat` means the model's other option is exactly the schema
+branch. A tool call or a valid answer, nothing else.
+
+## Scope discipline
+
+The composed grammar only works when vLLM owns the tool-call format, so this
+lands for the hermes and minimax builders first. Models whose tool grammars are
+opaque xgrammar builtins would need an upstream API to force the
+at-least-one-call rule, and reasoning models would fail the schema branch on
+their think preamble. Both of those fall back to the old behavior unchanged
+rather than half-working. The wiring hook checks for a composable model, no
+active reasoning parser, and the auto + schema combination, and composes only
+then.
+
+Revert-proofing the tests mattered to me here. Two of the wiring tests fail if
+you delete the compose hook, and the fallback tests stay green, so the suite
+actually pins the behavior instead of describing it. Sixty-six tests across the
+grammar, the registry, and request-level wiring, plus an end-to-end test that
+needs a GPU server and runs in CI.
+
+The PR is open and waiting on a maintainer ready label. The untriggered-text
+behavior of `TriggeredTagsFormat` is documented in xgrammar's source, but I
+haven't seen it called out anywhere in the context of grammar composition, so
+if you're building anything that unions a tool grammar with something else,
+check that your tool branch can't match the empty case.
