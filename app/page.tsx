@@ -1,8 +1,11 @@
 import KnowledgeGraph from "@/components/knowledge-graph";
-import { getContributions, shortRef } from "@/lib/contributions";
+import { shortRef } from "@/lib/contributions";
+import { getLiveContributions } from "@/lib/github-status";
 
-export default function Home() {
-  const contributions = getContributions();
+export const revalidate = 21600;
+
+export default async function Home() {
+  const contributions = await getLiveContributions();
 
   return (
     <>

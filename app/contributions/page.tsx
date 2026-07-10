@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { getContributions, groupByStatus, shortRef } from "@/lib/contributions";
+import { groupByStatus, shortRef } from "@/lib/contributions";
+import { getLiveContributions } from "@/lib/github-status";
 
 export const metadata: Metadata = {
   title: "Contributions",
 };
+
+export const revalidate = 21600;
 
 const SECTIONS = [
   ["merged", "Merged"],
@@ -11,8 +14,8 @@ const SECTIONS = [
   ["closed", "Closed"],
 ] as const;
 
-export default function Contributions() {
-  const groups = groupByStatus(getContributions());
+export default async function Contributions() {
+  const groups = groupByStatus(await getLiveContributions());
 
   return (
     <>
