@@ -1,0 +1,194 @@
+[
+  {
+    "repo": "docling-project/docling",
+    "pr": 3721,
+    "url": "https://github.com/docling-project/docling/pull/3721",
+    "title": "code language detection for parsed code blocks",
+    "date": "2026-07-02",
+    "status": "merged"
+  },
+  {
+    "repo": "docling-project/docling",
+    "pr": 3722,
+    "url": "https://github.com/docling-project/docling/pull/3722",
+    "title": "new BoxNote document backend",
+    "date": "2026-07-07",
+    "status": "merged"
+  },
+  {
+    "repo": "docling-project/docling-core",
+    "pr": 668,
+    "url": "https://github.com/docling-project/docling-core/pull/668",
+    "title": "mime type registration unblocking the BoxNote backend",
+    "date": "2026-07-03",
+    "status": "merged"
+  },
+  {
+    "repo": "dottxt-ai/outlines",
+    "pr": 1888,
+    "url": "https://github.com/dottxt-ai/outlines/pull/1888",
+    "title": "structured outputs fix for newer vLLM servers",
+    "date": "2026-07-03",
+    "status": "merged"
+  },
+  {
+    "repo": "docling-project/docling-mcp",
+    "pr": 104,
+    "url": "https://github.com/docling-project/docling-mcp/pull/104",
+    "title": "clear error for a misconfigured docling-serve URL",
+    "date": "2026-06-28",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling",
+    "pr": 3713,
+    "url": "https://github.com/docling-project/docling/pull/3713",
+    "title": "table recognition inside pictures, waiting on an architecture change",
+    "date": "2026-06-26",
+    "status": "closed"
+  },
+  {
+    "repo": "docling-project/docling",
+    "pr": 3702,
+    "url": "https://github.com/docling-project/docling/pull/3702",
+    "title": "optional-dependency imports broke the core converter in slim installs",
+    "date": "2026-06-26",
+    "status": "merged"
+  },
+  {
+    "repo": "modelcontextprotocol/inspector",
+    "pr": 1602,
+    "url": "https://github.com/modelcontextprotocol/inspector/pull/1602",
+    "title": "allOf and oneOf rendering in tool forms, deferred to Inspector V2",
+    "date": "2026-07-02",
+    "status": "closed"
+  },
+  {
+    "repo": "vllm-project/vllm",
+    "pr": 47439,
+    "url": "https://github.com/vllm-project/vllm/pull/47439",
+    "title": "response_format no longer suppresses tool calls when tool_choice is auto",
+    "date": "2026-07-02",
+    "status": "open"
+  },
+  {
+    "repo": "sgl-project/sglang",
+    "pr": 29952,
+    "url": "https://github.com/sgl-project/sglang/pull/29952",
+    "title": "msgpack round-trip for customized_info without the pickle wrap",
+    "date": "2026-07-02",
+    "status": "open"
+  },
+  {
+    "repo": "modelcontextprotocol/typescript-sdk",
+    "pr": 2418,
+    "url": "https://github.com/modelcontextprotocol/typescript-sdk/pull/2418",
+    "title": "double onerror on transport close, ported to v2 with a reconnect fix",
+    "date": "2026-07-02",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling-serve",
+    "pr": 647,
+    "url": "https://github.com/docling-project/docling-serve/pull/647",
+    "title": "opt-in provenance on the chunk endpoints",
+    "date": "2026-07-04",
+    "status": "open"
+  },
+  {
+    "repo": "openai/openai-agents-python",
+    "pr": 3728,
+    "url": "https://github.com/openai/openai-agents-python/pull/3728",
+    "title": "recovery hook for invalid structured output, maintainer shipped the same design",
+    "date": "2026-07-03",
+    "status": "closed"
+  },
+  {
+    "repo": "docling-project/docling",
+    "pr": 3753,
+    "url": "https://github.com/docling-project/docling/pull/3753",
+    "title": "recover table text orphaned by the reading order model",
+    "date": "2026-07-04",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling-mcp",
+    "pr": 107,
+    "url": "https://github.com/docling-project/docling-mcp/pull/107",
+    "title": "route the local converter through the VLM pipeline",
+    "date": "2026-07-04",
+    "status": "open"
+  },
+  {
+    "repo": "UKGovernmentBEIS/inspect_ai",
+    "pr": 4417,
+    "url": "https://github.com/UKGovernmentBEIS/inspect_ai/pull/4417",
+    "title": "deterministic crash recovery for multi-agent solvers",
+    "date": "2026-07-04",
+    "status": "open"
+  },
+  {
+    "repo": "vllm-project/vllm",
+    "pr": 47612,
+    "url": "https://github.com/vllm-project/vllm/pull/47612",
+    "title": "JSON tool-call fallback for llama4 pythonic parsing, both paths",
+    "date": "2026-07-04",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling-parse",
+    "pr": 294,
+    "url": "https://github.com/docling-project/docling-parse/pull/294",
+    "title": "Core-14 font aliases no longer fall back to flat glyph widths",
+    "date": "2026-07-05",
+    "status": "open"
+  },
+  {
+    "repo": "dottxt-ai/outlines",
+    "pr": 1903,
+    "url": "https://github.com/dottxt-ai/outlines/pull/1903",
+    "title": "vision model support through mlx-vlm",
+    "date": "2026-07-05",
+    "status": "open"
+  },
+  {
+    "repo": "vllm-project/vllm",
+    "pr": 48157,
+    "url": "https://github.com/vllm-project/vllm/pull/48157",
+    "title": "composed tool-call and response-format grammar for structured outputs",
+    "date": "2026-07-09",
+    "status": "open"
+  },
+  {
+    "repo": "cuthbertLab/music21",
+    "pr": 1973,
+    "url": "https://github.com/cuthbertLab/music21/pull/1973",
+    "title": "unpitched grace notes exported schema-invalid MusicXML",
+    "date": "2026-07-05",
+    "status": "merged"
+  },
+  {
+    "repo": "docling-project/docling",
+    "pr": 3789,
+    "url": "https://github.com/docling-project/docling/pull/3789",
+    "title": "form clusters no longer swallow tables",
+    "date": "2026-07-10",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling-jobkit",
+    "pr": 199,
+    "url": "https://github.com/docling-project/docling-jobkit/pull/199",
+    "title": "custom preset dicts validated into real options models",
+    "date": "2026-07-10",
+    "status": "open"
+  },
+  {
+    "repo": "docling-project/docling-ibm-models",
+    "pr": 168,
+    "url": "https://github.com/docling-project/docling-ibm-models/pull/168",
+    "title": "image processor registration crash on transformers 5.13",
+    "date": "2026-07-10",
+    "status": "open"
+  }
+]

@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "graph": "node scripts/build-graph.mjs",
-    "prebuild": "node scripts/build-graph.mjs"
+    "prebuild": "node scripts/build-graph.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "d3-force": "^3.0.0",
@@ -21,6 +22,7 @@
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }
