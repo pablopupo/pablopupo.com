@@ -1,18 +1,7 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import Nav from "./nav";
 import { siteUrl, siteTitle, siteDescription } from "@/lib/site";
 import "./globals.css";
-
-const newsreader = localFont({
-  src: [
-    { path: "./fonts/newsreader-latin-wght-normal.woff2", style: "normal" },
-    { path: "./fonts/newsreader-latin-wght-italic.woff2", style: "italic" },
-  ],
-  weight: "200 800",
-  variable: "--font-serif",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -32,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={newsreader.variable}>
+    <html lang="en">
       <body>
         <header>
           <Nav />

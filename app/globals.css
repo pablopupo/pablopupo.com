@@ -31,8 +31,8 @@ html {
 }
 
 body {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: 1.1875rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
   line-height: 1.65;
   background: var(--bg);
   color: var(--ink);
@@ -99,7 +99,7 @@ header nav a[aria-current] {
 }
 
 header nav a.wordmark {
-  font-family: var(--font-serif), Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--ink);

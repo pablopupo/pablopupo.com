@@ -69,9 +69,8 @@ export default async function Home() {
 
       <h2 className="label">Connections</h2>
       <p className="graph-note">
-        The work on this site, drawn as one map. I tagged the solid edges by
-        hand; the dashed ones are computed from the text at build time. Hover
-        to explore.
+        The work on this site, drawn as one map. Hover to explore, click to
+        open.
       </p>
       <KnowledgeGraph />
     </>

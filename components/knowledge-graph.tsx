@@ -111,7 +111,7 @@ export default function KnowledgeGraph() {
     const nodes: SimNode[] = (graph.nodes as SimNode[]).map((n) => ({ ...n }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const edges: SimEdge[] = (graph.edges as SimEdge[])
-      .filter((e) => byId.has(e.s) && byId.has(e.t))
+      .filter((e) => e.kind !== "semantic" && byId.has(e.s) && byId.has(e.t))
       .map((e) => ({ ...e, source: byId.get(e.s)!, target: byId.get(e.t)! }));
 
     const neighbors = new Map<string, Set<string>>();
@@ -123,10 +123,7 @@ export default function KnowledgeGraph() {
     }
 
     const labeled = new Set(
-      [...nodes]
-        .sort((a, b) => b.deg - a.deg)
-        .slice(0, 5)
-        .map((n) => n.id)
+      nodes.filter((n) => n.type !== "oss").map((n) => n.id)
     );
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -253,7 +250,7 @@ export default function KnowledgeGraph() {
         const showLabel = isActive || inHood || (state.labeled.has(n.id) && !typeHidden);
         if (showLabel) {
           ctx.globalAlpha = typeHidden ? 0.15 : 1;
-          ctx.font = `10px ${t.mono}`;
+          ctx.font = `11px ${t.mono}`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
           const y = n.y + r + 4;
@@ -284,7 +281,7 @@ export default function KnowledgeGraph() {
         )
         .force(
           "charge",
-          forceManyBody<SimNode>().strength((d) => (d.type === "concept" ? -85 : -130))
+          forceManyBody<SimNode>().strength((d) => (d.type === "concept" ? -110 : -170))
         )
         .force("collide", forceCollide<SimNode>((d) => radius(d) + 8))
         .force("x", forceX<SimNode>(state.width / 2).strength(0.09))
