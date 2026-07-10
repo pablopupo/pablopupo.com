@@ -79,6 +79,14 @@
       "tags": ["music", "notation"]
     },
     {
+      "id": "chopin-etudes",
+      "label": "Chopin Etudes",
+      "type": "music",
+      "href": null,
+      "text": "Chopin Etudes, the first corpus for gradus-ad-parnassum and core repertoire. Piano performance and practice.",
+      "tags": ["piano", "music", "notation"]
+    },
+    {
       "id": "docling-3702",
       "label": "docling #3702",
       "type": "oss",
