@@ -8,6 +8,7 @@ type PublishBody = {
   title: string;
   date: string;
   description?: string;
+  tags?: string[];
   draft: boolean;
   body: string;
 };
@@ -15,6 +16,9 @@ type PublishBody = {
 function compose(p: PublishBody): string {
   const lines = ["---", `title: ${p.title}`, `date: "${p.date}"`];
   if (p.description) lines.push(`description: ${p.description}`);
+  if (p.tags && p.tags.length > 0) {
+    lines.push(`tags: [${p.tags.join(", ")}]`);
+  }
   if (p.draft) lines.push("draft: true");
   lines.push("---", "", p.body.trim(), "");
   return lines.join("\n");

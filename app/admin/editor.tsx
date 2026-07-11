@@ -31,6 +31,7 @@ export default function Editor() {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState("");
   const [draft, setDraft] = useState(true);
   const [body, setBody] = useState("");
   const [status, setStatus] = useState("");
@@ -88,6 +89,7 @@ export default function Editor() {
         title?: string;
         date?: string;
         description?: string;
+        tags?: string[];
         draft?: boolean;
       };
       body: string;
@@ -97,6 +99,9 @@ export default function Editor() {
     setTitle(data.frontmatter.title ?? "");
     setDate(data.frontmatter.date ?? today());
     setDescription(data.frontmatter.description ?? "");
+    setTags(
+      Array.isArray(data.frontmatter.tags) ? data.frontmatter.tags.join(", ") : ""
+    );
     setDraft(data.frontmatter.draft === true);
     setBody(data.body);
   }
@@ -107,6 +112,7 @@ export default function Editor() {
     setTitle("");
     setDate(today());
     setDescription("");
+    setTags("");
     setDraft(true);
     setBody("");
     setStatus("");
@@ -119,7 +125,18 @@ export default function Editor() {
     const res = await fetch("/api/admin/publish", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug, title, date, description, draft, body }),
+      body: JSON.stringify({
+        slug,
+        title,
+        date,
+        description,
+        tags: tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        draft,
+        body,
+      }),
     });
     const data = (await res.json().catch(() => null)) as {
       commitUrl?: string;
@@ -208,6 +225,11 @@ export default function Editor() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="description (excerpt)"
+        />
+        <input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="tags, comma separated (music puts it on the music page)"
         />
         <label className="mono-note">
           <input
