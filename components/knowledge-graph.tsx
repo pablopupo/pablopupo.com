@@ -11,7 +11,14 @@ import {
 } from "d3-force";
 import graph from "../data/graph.generated.json";
 
-type NodeType = "project" | "oss" | "concept" | "writing" | "music";
+type NodeType =
+  | "project"
+  | "oss"
+  | "concept"
+  | "writing"
+  | "music"
+  | "work"
+  | "education";
 
 type SimNode = {
   id: string;
@@ -49,6 +56,8 @@ const TYPE_LABELS: Record<NodeType, string> = {
   concept: "concepts",
   writing: "writing",
   music: "music",
+  work: "work",
+  education: "education",
 };
 
 const TYPE_GLYPHS: Record<NodeType, string> = {
@@ -57,12 +66,20 @@ const TYPE_GLYPHS: Record<NodeType, string> = {
   concept: "○",
   writing: "◉",
   music: "◆",
+  work: "■",
+  education: "□",
 };
 
 function radius(node: SimNode): number {
-  const base = { project: 4.5, oss: 3.2, concept: 3.4, writing: 4, music: 3.8 }[
-    node.type
-  ];
+  const base = {
+    project: 4.5,
+    oss: 3.2,
+    concept: 3.4,
+    writing: 4,
+    music: 3.8,
+    work: 4.5,
+    education: 4,
+  }[node.type];
   return base + Math.min(node.deg * 0.35, 2.5);
 }
 
@@ -217,11 +234,14 @@ export default function KnowledgeGraph() {
           ctx.lineTo(n.x, n.y + d);
           ctx.lineTo(n.x - d, n.y);
           ctx.closePath();
+        } else if (n.type === "work" || n.type === "education") {
+          const s = r * 0.9;
+          ctx.rect(n.x - s, n.y - s, s * 2, s * 2);
         } else {
           ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         }
 
-        if (n.type === "concept") {
+        if (n.type === "concept" || n.type === "education") {
           ctx.fillStyle = t.bg;
           ctx.fill();
           ctx.strokeStyle = isActive ? t.accent : t.ink;

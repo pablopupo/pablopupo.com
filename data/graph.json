@@ -79,6 +79,22 @@
       "tags": ["music", "notation"]
     },
     {
+      "id": "handtevy",
+      "label": "Handtevy",
+      "type": "work",
+      "href": null,
+      "text": "AI engineering intern at Handtevy. Document intelligence pipelines for emergency medicine software used by 200,000+ clinicians. Extraction, retrieval, and eval harnesses for clinical documents that cannot afford to be wrong.",
+      "tags": ["document-intelligence", "emergency-medicine", "evals", "retrieval", "structured-extraction"]
+    },
+    {
+      "id": "university-of-florida",
+      "label": "University of Florida",
+      "type": "education",
+      "href": null,
+      "text": "CS student at the University of Florida. Home of the SubjuGator RoboSub team.",
+      "tags": ["subjugator-website"]
+    },
+    {
       "id": "chopin-etudes",
       "label": "Chopin Etudes",
       "type": "music",
