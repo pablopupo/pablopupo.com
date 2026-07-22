@@ -1,41 +1,36 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getPosts, formatDate } from "@/lib/posts";
+import { PublicEntryList } from "@/components/public-entry-list";
+import { createPageMetadata } from "@/lib/metadata";
+import { getPublicEntries } from "@/lib/public-content";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Writing",
-};
+  description:
+    "Technical notes and essays on applied AI, software engineering, and systems.",
+  canonical: "/writing",
+});
 
-export default function Writing() {
-  const posts = getPosts();
+export const revalidate = 60;
+
+export default async function Writing() {
+  const entries = (await getPublicEntries()).filter(
+    (entry) => entry.section === "writing"
+  );
 
   return (
-    <>
-      <h1>Writing</h1>
-      <p>
-        Essays land here. Rough notes are already public at{" "}
-        <a href="https://github.com/pablopupo/notes">
-          github.com/pablopupo/notes
-        </a>
-        .
-      </p>
-      {posts.length > 0 && (
-        <ul className="posts">
-          {posts.map((post) => (
-            <li key={post.slug}>
-              <div className="head">
-                <Link href={`/writing/${post.slug}`}>{post.title}</Link>
-              </div>
-              <span className="meta">
-                <time dateTime={post.date}>{formatDate(post.date)}</time>
-                {" · "}
-                {post.readMinutes} min read
-              </span>
-              {post.description && <p className="excerpt">{post.description}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    <div className="public-index reading-shell">
+      <header className="page-header">
+        <p className="eyebrow">Notes and essays</p>
+        <h1>Writing</h1>
+        <p>
+          Technical notes on applied AI, software engineering, and what I am
+          learning while building.
+        </p>
+      </header>
+      <PublicEntryList
+        entries={entries}
+        emptyMessage="No writing published yet."
+      />
+    </div>
   );
 }

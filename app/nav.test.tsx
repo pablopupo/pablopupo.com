@@ -30,15 +30,31 @@ beforeEach(() => {
 });
 
 describe("site navigation", () => {
-  it("uses Next.js client links and marks the current section on public paths", () => {
+  it("keeps the wordmark visible and exposes the four public sections", () => {
     pathname = "/writing/example";
 
     const html = renderToStaticMarkup(<Nav />);
 
     expect(html.match(/data-next-link="true"/g)).toHaveLength(6);
     expect(html).toContain(
+      '<a href="/" data-next-link="true" class="wordmark">Pablo Pupo</a>'
+    );
+    expect(html).toContain('<a href="/work" data-next-link="true">Work</a>');
+    expect(html).toContain(
       '<a href="/writing" data-next-link="true" aria-current="page">Writing</a>'
     );
+    expect(html).toContain('<a href="/music" data-next-link="true">Music</a>');
+    expect(html).toContain('<a href="/about" data-next-link="true">About</a>');
+    expect(html).not.toContain("Projects");
+    expect(html).not.toContain("Contributions");
+  });
+
+  it("provides a compact labeled search control", () => {
+    const html = renderToStaticMarkup(<Nav />);
+
+    expect(html).toContain('href="/search"');
+    expect(html).toContain('aria-label="Search this site"');
+    expect(html).toContain("Search");
   });
 
   it("uses plain anchors on admin paths so dirty editors receive beforeunload", () => {
@@ -48,6 +64,7 @@ describe("site navigation", () => {
 
     expect(html).not.toContain('data-next-link="true"');
     expect(html).toContain('<a href="/" class="wordmark">Pablo Pupo</a>');
+    expect(html).toContain('<a href="/work">Work</a>');
     expect(html).toContain('<a href="/writing">Writing</a>');
   });
 });

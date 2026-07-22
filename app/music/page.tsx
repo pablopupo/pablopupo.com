@@ -1,44 +1,104 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getPosts, formatDate } from "@/lib/posts";
+import MarkdownContent from "@/components/markdown-content";
+import {
+  formatEditorialDate,
+  PublicEntryList,
+  YoutubeEmbed,
+} from "@/components/public-entry-list";
+import {
+  getPublicEntries,
+  type PublicEntry,
+  type PublicPerformance,
+} from "@/lib/public-content";
+import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Music",
-};
+  description: "Piano performances and writing about music by Pablo Pupo.",
+  canonical: "/music",
+});
 
-export default function Music() {
-  const posts = getPosts().filter((post) => post.tags.includes("music"));
+export const revalidate = 60;
+
+function isPerformanceEntry(
+  entry: PublicEntry
+): entry is PublicEntry & { performance: PublicPerformance } {
+  return entry.kind === "performance" && entry.performance !== null;
+}
+
+export default async function Music() {
+  const entries = (await getPublicEntries()).filter(
+    (entry) => entry.section === "music"
+  );
+  const performances = entries.filter(isPerformanceEntry);
+  const writing = entries.filter((entry) => entry.kind !== "performance");
 
   return (
-    <>
-      <h1>Music</h1>
-      <p>
-        I&rsquo;m a classical pianist. Recordings, program notes, and thoughts
-        on music land here, next to the theory work that feeds{" "}
-        <a href="https://github.com/pablopupo/gradus-ad-parnassum">
-          gradus-ad-parnassum
-        </a>
-        .
-      </p>
-      {posts.length > 0 ? (
-        <ul className="posts">
-          {posts.map((post) => (
-            <li key={post.slug}>
-              <div className="head">
-                <Link href={`/writing/${post.slug}`}>{post.title}</Link>
-              </div>
-              <span className="meta">
-                <time dateTime={post.date}>{formatDate(post.date)}</time>
-                {" · "}
-                {post.readMinutes} min read
-              </span>
-              {post.description && <p className="excerpt">{post.description}</p>}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="graph-note">Nothing posted yet.</p>
-      )}
-    </>
+    <div className="public-index music-index">
+      <header className="page-header reading-shell">
+        <p className="eyebrow">Piano</p>
+        <h1>Music</h1>
+        <p>
+          Performances, practice notes, and writing about the music I study.
+        </p>
+      </header>
+
+      <section className="index-section" aria-labelledby="performances-title">
+        <div className="section-heading">
+          <h2 id="performances-title">Performances</h2>
+        </div>
+        {performances.length > 0 ? (
+          <div className="performance-list">
+            {performances.map((entry) => {
+              const performance = entry.performance;
+              return (
+                <article className="performance" key={entry.slug}>
+                  <div className="performance-heading">
+                    <div>
+                      <p className="eyebrow">
+                        {performance.workTitle} · {performance.composer}
+                      </p>
+                      <h3>
+                        <a href={`/music/${entry.slug}`}>{entry.title}</a>
+                      </h3>
+                    </div>
+                    {performance.performedAt && (
+                      <time dateTime={performance.performedAt}>
+                        {formatEditorialDate(performance.performedAt)}
+                      </time>
+                    )}
+                  </div>
+                  <YoutubeEmbed
+                    url={performance.youtubeUrl}
+                    title={`${performance.workTitle} by ${performance.composer}`}
+                  />
+                  {entry.summary && (
+                    <p className="performance-summary">{entry.summary}</p>
+                  )}
+                  {performance.notesMarkdown && (
+                    <MarkdownContent markdown={performance.notesMarkdown} />
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="empty-state">No performances published yet.</p>
+        )}
+      </section>
+
+      <section
+        className="index-section reading-shell"
+        aria-labelledby="music-writing-title"
+      >
+        <div className="section-heading">
+          <h2 id="music-writing-title">Writing about music</h2>
+        </div>
+        <PublicEntryList
+          entries={writing}
+          emptyMessage="No music writing published yet."
+        />
+      </section>
+    </div>
   );
 }

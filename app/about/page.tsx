@@ -1,29 +1,78 @@
 import type { Metadata } from "next";
+import MarkdownContent from "@/components/markdown-content";
+import { createPageMetadata } from "@/lib/metadata";
+import { getPublicProfile } from "@/lib/public-profile";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "About",
-};
+  description:
+    "About Pablo Pupo, a software engineer focused on applied AI and a classical pianist.",
+  canonical: "/about",
+});
 
-export default function About() {
+export const revalidate = 60;
+
+function graduationLabel(value: string | null) {
+  if (!value) return null;
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+export default async function About() {
+  const profile = await getPublicProfile();
+  const graduation = graduationLabel(profile.graduationOn);
+
   return (
-    <>
-      <h1>About</h1>
-      <p>
-        I grew up in Miami and I&rsquo;m studying computer science at the
-        University of Florida. Right now I&rsquo;m an AI engineering intern at
-        Handtevy, where I build document intelligence pipelines for emergency
-        medicine software that more than 200,000 clinicians use.
-      </p>
-      <p>
-        That work is why I care about extraction, retrieval, and eval harnesses
-        for systems that cannot afford to be wrong. It is also where most of my
-        open source time goes, mainly to docling, vLLM, SGLang, and the MCP
-        SDKs.
-      </p>
-      <p>
-        I&rsquo;m also a classical pianist. On the side I founded and run
-        Accordo, a booking and payments marketplace for musicians.
-      </p>
-    </>
+    <article className="about-page reading-shell">
+      <header className="page-header">
+        <p className="eyebrow">{profile.siteTitle}</p>
+        <h1>About</h1>
+        <p className="about-headline">{profile.headline}</p>
+      </header>
+
+      <section aria-labelledby="applied-ai-title">
+        <h2 id="applied-ai-title">Applied AI</h2>
+        <MarkdownContent markdown={profile.aboutMarkdown} />
+        <p>
+          I am learning more about AI systems, especially inference, serving,
+          runtime behavior, performance, reliability, and evaluation. I
+          publish notes here as I turn that study into working systems.
+        </p>
+      </section>
+
+      <section aria-labelledby="music-about-title">
+        <h2 id="music-about-title">Music</h2>
+        <p>
+          I am a classical pianist. I share piano performances, practice notes,
+          and writing about the music I study.
+        </p>
+      </section>
+
+      <section aria-labelledby="education-title">
+        <h2 id="education-title">Education</h2>
+        <p>
+          I study computer science at the University of Florida
+          {graduation ? ` and expect to graduate in ${graduation}` : ""}.
+          {profile.location ? ` I am based in ${profile.location}.` : ""}
+        </p>
+      </section>
+
+      <section aria-labelledby="contact-title">
+        <h2 id="contact-title">Contact</h2>
+        <p className="profile-links">
+          <a href="/resume">Resume</a>
+          {profile.contactEmail && (
+            <a href={`mailto:${profile.contactEmail}`}>Email</a>
+          )}
+          {profile.githubUrl && <a href={profile.githubUrl}>GitHub</a>}
+          {profile.linkedinUrl && <a href={profile.linkedinUrl}>LinkedIn</a>}
+        </p>
+      </section>
+    </article>
   );
 }

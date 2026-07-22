@@ -26,7 +26,7 @@ afterEach(async () => {
 }, PGLITE_TEST_TIMEOUT_MS);
 
 describe("content repository public reads", () => {
-  it("returns only published entries at or before now, newest first", async () => {
+  it("returns published and due scheduled entries, newest first", async () => {
     const { client, repository } = await setup();
     await client.exec(
       `INSERT INTO entries (slug, kind, status, title, body_markdown, published_at)
@@ -44,7 +44,11 @@ describe("content repository public reads", () => {
       new Date("2026-07-22T12:00:00Z")
     );
 
-    expect(result.map((entry) => entry.slug)).toEqual(["newest", "older"]);
+    expect(result.map((entry) => entry.slug)).toEqual([
+      "newest",
+      "older",
+      "past-scheduled",
+    ]);
   });
 
   it("uses slug as a deterministic tie-breaker for entries", async () => {
@@ -62,12 +66,14 @@ describe("content repository public reads", () => {
     expect(result.map((entry) => entry.slug)).toEqual(["same-time-a", "same-time-b"]);
   });
 
-  it("does not return a draft or future entry by slug", async () => {
+  it("returns due scheduled entries by slug but hides drafts and future entries", async () => {
     const { client, repository } = await setup();
     await client.exec(
       `INSERT INTO entries (slug, status, title, body_markdown, published_at)
        VALUES
          ('visible', 'published', 'Visible', 'Body', '2026-07-20T12:00:00Z'),
+         ('due-scheduled', 'scheduled', 'Due scheduled', 'Body', '2026-07-21T12:00:00Z'),
+         ('future-scheduled', 'scheduled', 'Future scheduled', 'Body', '2026-08-02T12:00:00Z'),
          ('hidden-draft', 'draft', 'Hidden draft', 'Body', NULL),
          ('hidden-future', 'published', 'Hidden future', 'Body', '2026-08-01T12:00:00Z')`
     );
@@ -76,6 +82,12 @@ describe("content repository public reads", () => {
     await expect(repository.getPublishedEntry("visible", now)).resolves.toMatchObject({
       slug: "visible",
     });
+    await expect(
+      repository.getPublishedEntry("due-scheduled", now)
+    ).resolves.toMatchObject({ slug: "due-scheduled" });
+    await expect(
+      repository.getPublishedEntry("future-scheduled", now)
+    ).resolves.toBeUndefined();
     await expect(repository.getPublishedEntry("hidden-draft", now)).resolves.toBeUndefined();
     await expect(repository.getPublishedEntry("hidden-future", now)).resolves.toBeUndefined();
   });
@@ -101,6 +113,7 @@ describe("content repository public reads", () => {
 
     expect(result.map((project) => project.slug)).toEqual([
       "first",
+      "scheduled-project",
       "tie-a",
       "tie-b",
       "third",

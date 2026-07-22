@@ -13,18 +13,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const entry = await getPublicEntry(slug);
-  if (!entry || entry.section !== "writing") return {};
+  if (!entry || entry.section !== "music") return {};
   return createEntryMetadata(entry);
 }
 
-export default async function PostPage({
+export default async function MusicEntryPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
   const entry = await getPublicEntry(slug);
-  if (!entry || entry.section !== "writing") notFound();
+  if (!entry || entry.section !== "music") notFound();
 
   return <PublicEntryPage entry={entry} />;
 }

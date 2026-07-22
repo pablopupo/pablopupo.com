@@ -1,79 +1,133 @@
+import type { Metadata } from "next";
 import KnowledgeGraph from "@/components/knowledge-graph";
-import { shortRef } from "@/lib/contributions";
+import MarkdownContent from "@/components/markdown-content";
+import { PublicEntryList } from "@/components/public-entry-list";
+import { OpenSourceList, ProjectList } from "@/components/public-work";
 import { getLiveContributions } from "@/lib/github-status";
+import { createPublicAlternates } from "@/lib/metadata";
+import { getPublicEntries, getPublicProjects } from "@/lib/public-content";
+import { getPublicProfile } from "@/lib/public-profile";
 
-export const revalidate = 21600;
+export const revalidate = 60;
+
+export const metadata: Metadata = {
+  alternates: createPublicAlternates("/"),
+};
+
+function graduationLabel(value: string | null) {
+  if (!value) return null;
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
 
 export default async function Home() {
-  const contributions = await getLiveContributions();
+  const [profile, projects, entries, contributions] = await Promise.all([
+    getPublicProfile(),
+    getPublicProjects(),
+    getPublicEntries(),
+    getLiveContributions(),
+  ]);
+  const writing = entries
+    .filter((entry) => entry.section === "writing")
+    .slice(0, 3);
+  const music = entries
+    .filter((entry) => entry.section === "music")
+    .slice(0, 3);
+  const graduation = graduationLabel(profile.graduationOn);
 
   return (
-    <>
-      <h1>Pablo Pupo</h1>
-      <p className="intro">
-        I&rsquo;m a CS student at the University of Florida and I work in
-        applied AI. I build document intelligence pipelines at Handtevy for
-        emergency medicine software used by 200,000+ clinicians, contribute to
-        open source (docling, vLLM, SGLang, MCP SDKs), and I&rsquo;m a
-        classical pianist.
-      </p>
+    <div className="home-page">
+      <section className="hero" aria-labelledby="home-title">
+        <div className="portrait-frame">
+          <img
+            src={profile.portraitUrl}
+            alt={profile.portraitAlt}
+            width={680}
+            height={680}
+            fetchPriority="high"
+          />
+        </div>
+        <div className="hero-copy">
+          <p className="eyebrow">{profile.siteTitle}</p>
+          <h1 id="home-title">{profile.headline}</h1>
+          <MarkdownContent markdown={profile.introMarkdown} />
+          <dl className="profile-facts">
+            {profile.location && (
+              <div>
+                <dt>Based in</dt>
+                <dd>{profile.location}</dd>
+              </div>
+            )}
+            {graduation && (
+              <div>
+                <dt>Graduation</dt>
+                <dd>{graduation}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="profile-links">
+            <a href="/resume">Resume</a>
+            {profile.contactEmail && (
+              <a href={`mailto:${profile.contactEmail}`}>Email</a>
+            )}
+            {profile.githubUrl && <a href={profile.githubUrl}>GitHub</a>}
+            {profile.linkedinUrl && <a href={profile.linkedinUrl}>LinkedIn</a>}
+          </p>
+        </div>
+      </section>
 
-      <h2 className="label">Selected work</h2>
-      <ul className="entries">
-        <li>
-          <a
-            className="name"
-            href="https://github.com/pablopupo/gradus-ad-parnassum"
-          >
-            gradus-ad-parnassum
-          </a>
-          <span className="desc">RAG over musical notation, in progress</span>
-        </li>
-        <li>
-          <a className="name" href="https://github.com/pablopupo/kit-ai">
-            kit-ai
-          </a>
-          <span className="desc">offline-first emergency first-aid PWA</span>
-        </li>
-        <li>
-          <a
-            className="name"
-            href="https://huggingface.co/Pablo305/llama3-medical-3b-4bit"
-          >
-            llama3-medical-3b-4bit
-          </a>
-          <span className="desc">Llama 3.2 3B fine-tuned for first-aid QA</span>
-        </li>
-        <li>
-          <span className="name">Accordo</span>
-          <span className="desc">
-            booking and payments marketplace for musicians
-          </span>
-        </li>
-      </ul>
+      <section className="graph-section" aria-labelledby="connections-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Explore</p>
+            <h2 id="connections-title">Knowledge graph</h2>
+          </div>
+          <p>
+            Projects, technical notes, music, and the ideas connecting them.
+          </p>
+        </div>
+        <KnowledgeGraph />
+      </section>
 
-      <h2 className="label">Recent open source</h2>
-      <ul className="prs">
-        {contributions.slice(0, 3).map((c) => (
-          <li key={c.url}>
-            <a className="id" href={c.url}>
-              {shortRef(c)}
-            </a>
-            <span className="desc">{c.title}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="more">
-        <a href="/contributions">all {contributions.length} contributions</a>
-      </p>
+      <section className="home-section" aria-labelledby="selected-work-title">
+        <div className="section-heading">
+          <h2 id="selected-work-title">Selected work</h2>
+          <a href="/work">All work</a>
+        </div>
+        <ProjectList projects={projects.slice(0, 3)} compact />
+      </section>
 
-      <h2 className="label">Connections</h2>
-      <p className="graph-note">
-        The work on this site, drawn as one map. I tagged the solid edges by
-        hand; the dashed ones are computed from the text at build time. Hover
-        to explore.
-      </p>
-      <KnowledgeGraph />
-    </>
+      <section className="home-section" aria-labelledby="recent-writing-title">
+        <div className="section-heading">
+          <h2 id="recent-writing-title">Recent writing</h2>
+          <a href="/writing">All writing</a>
+        </div>
+        <PublicEntryList
+          entries={writing}
+          emptyMessage="Writing is coming soon."
+        />
+      </section>
+
+      <section className="home-section" aria-labelledby="recent-music-title">
+        <div className="section-heading">
+          <h2 id="recent-music-title">Recent music</h2>
+          <a href="/music">All music</a>
+        </div>
+        <PublicEntryList entries={music} emptyMessage="Music is coming soon." />
+      </section>
+
+      <section className="home-section" aria-labelledby="open-source-title">
+        <div className="section-heading">
+          <h2 id="open-source-title">Open source</h2>
+          <a href="/work#open-source">All contributions</a>
+        </div>
+        <OpenSourceList contributions={contributions} limit={3} />
+      </section>
+    </div>
   );
 }

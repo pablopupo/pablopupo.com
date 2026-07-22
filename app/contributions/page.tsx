@@ -1,52 +1,5 @@
-import type { Metadata } from "next";
-import { groupByStatus, shortRef } from "@/lib/contributions";
-import { getLiveContributions } from "@/lib/github-status";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Contributions",
-};
-
-export const revalidate = 21600;
-
-const SECTIONS = [
-  ["merged", "Merged"],
-  ["open", "In review"],
-  ["closed", "Closed"],
-] as const;
-
-export default async function Contributions() {
-  const groups = groupByStatus(await getLiveContributions());
-
-  return (
-    <>
-      <h1>Open source contributions</h1>
-      <p>
-        Everything I have shipped or have in flight across the LLM serving and
-        document intelligence stack, as GitHub user{" "}
-        <a href="https://github.com/pablopupo">pablopupo</a>.
-      </p>
-      {SECTIONS.map(([key, label]) =>
-        groups[key].length > 0 ? (
-          <section key={key}>
-            <h2 className="label">{label}</h2>
-            <ul className="prs">
-              {groups[key].map((c) => (
-                <li key={c.url}>
-                  <a className="id" href={c.url}>
-                    {shortRef(c)}
-                  </a>
-                  <span className="desc">{c.title}</span>
-                  {c.writeup && (
-                    <a className="writeup" href={`/writing/${c.writeup}`}>
-                      writeup
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null
-      )}
-    </>
-  );
+export default function Contributions() {
+  redirect("/work");
 }
