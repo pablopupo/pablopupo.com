@@ -6,4 +6,5 @@ next-env.d.ts
 *.tsbuildinfo
 .gstack/
 .superpowers/
+.worktrees/
 .env*
