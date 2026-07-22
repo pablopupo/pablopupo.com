@@ -1,288 +1,500 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { marked } from "marked";
+import { authClient } from "@/lib/auth-client";
 
-type PostSummary = {
-  slug: string;
-  title: string;
-  date: string;
-  draft: boolean;
+type AdminMode = "unconfigured" | "signed-out" | "forbidden" | "authorized";
+
+type ConfigurationStatus = {
+  configured: boolean;
+  missing: string[];
+  invalid: string[];
 };
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+type PerformanceFields = {
+  workTitle: string;
+  composer: string;
+  venue: string;
+  performedAt: string;
+  youtubeUrl: string;
+  notesMarkdown: string;
+};
+
+type EditorEntry = {
+  id: string | null;
+  slug: string;
+  kind: "note" | "essay" | "performance";
+  status: "draft" | "scheduled" | "published" | "archived";
+  title: string;
+  summary: string;
+  bodyMarkdown: string;
+  publishedAt: string | null;
+  updatedAt: string | null;
+  version: number;
+  performance: PerformanceFields;
+};
+
+type EntrySummary = Pick<
+  EditorEntry,
+  "id" | "slug" | "kind" | "status" | "title" | "publishedAt" | "updatedAt" | "version"
+>;
+
+type EditorProps = {
+  mode: AdminMode;
+  configurationStatus?: ConfigurationStatus;
+};
+
+const blankPerformance: PerformanceFields = {
+  workTitle: "",
+  composer: "",
+  venue: "",
+  performedAt: "",
+  youtubeUrl: "",
+  notesMarkdown: "",
+};
+
+function blankEntry(): EditorEntry {
+  return {
+    id: null,
+    slug: "",
+    kind: "note",
+    status: "draft",
+    title: "",
+    summary: "",
+    bodyMarkdown: "",
+    publishedAt: null,
+    updatedAt: null,
+    version: 0,
+    performance: { ...blankPerformance },
+  };
 }
 
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+export function formatDateTimeLocal(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const part = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(
+    date.getDate()
+  )}T${part(date.getHours())}:${part(date.getMinutes())}`;
 }
 
-export default function Editor() {
-  const [authed, setAuthed] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [password, setPassword] = useState("");
-  const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState(today());
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState("");
-  const [draft, setDraft] = useState(true);
-  const [body, setBody] = useState("");
-  const [status, setStatus] = useState("");
-  const [commitUrl, setCommitUrl] = useState("");
+export function parseDateTimeLocal(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 
-  async function loadPosts() {
-    const res = await fetch("/api/admin/posts");
-    if (res.ok) {
-      const data = (await res.json()) as { posts: PostSummary[] };
-      setPosts(data.posts);
-      setAuthed(true);
-    } else if (res.status !== 401) {
-      const data = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      setStatus(data?.error ?? `error ${res.status}`);
-      setAuthed(true);
+export function shouldDiscardUnsavedChanges(
+  dirty: boolean,
+  confirmDiscard: () => boolean = () =>
+    window.confirm("Discard unsaved changes?")
+) {
+  return !dirty || confirmDiscard();
+}
+
+export function unsavedEntryActionMessage(dirty: boolean) {
+  return dirty ? "Save changes before using entry actions" : undefined;
+}
+
+export async function runBusyEditorOperation<T>(
+  operation: () => Promise<T>,
+  setBusy: (busy: boolean) => void,
+  onError: (message: string) => void
+) {
+  setBusy(true);
+  try {
+    return await operation();
+  } catch {
+    onError("Network request failed");
+    return undefined;
+  } finally {
+    setBusy(false);
+  }
+}
+
+function normalizeEntry(value: Record<string, unknown>): EditorEntry {
+  const performance = (value.performance ?? {}) as Partial<PerformanceFields>;
+  return {
+    id: typeof value.id === "string" ? value.id : null,
+    slug: typeof value.slug === "string" ? value.slug : "",
+    kind:
+      value.kind === "essay" || value.kind === "performance" ? value.kind : "note",
+    status:
+      value.status === "scheduled" || value.status === "published" || value.status === "archived"
+        ? value.status
+        : "draft",
+    title: typeof value.title === "string" ? value.title : "",
+    summary: typeof value.summary === "string" ? value.summary : "",
+    bodyMarkdown: typeof value.bodyMarkdown === "string" ? value.bodyMarkdown : "",
+    publishedAt: typeof value.publishedAt === "string" ? value.publishedAt : null,
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
+    version: typeof value.version === "number" ? value.version : 0,
+    performance: {
+      workTitle: performance.workTitle ?? "",
+      composer: performance.composer ?? "",
+      venue: performance.venue ?? "",
+      performedAt: formatDateTimeLocal(performance.performedAt),
+      youtubeUrl: performance.youtubeUrl ?? "",
+      notesMarkdown: performance.notesMarkdown ?? "",
+    },
+  };
+}
+
+function mutation(entry: EditorEntry) {
+  return {
+    slug: entry.slug,
+    kind: entry.kind,
+    status: entry.status,
+    title: entry.title,
+    summary: entry.summary || null,
+    bodyMarkdown: entry.bodyMarkdown,
+    publishedAt: entry.publishedAt,
+    performance:
+      entry.kind === "performance"
+        ? {
+            workTitle: entry.performance.workTitle,
+            composer: entry.performance.composer,
+            venue: entry.performance.venue || undefined,
+            performedAt: parseDateTimeLocal(entry.performance.performedAt),
+            youtubeUrl: entry.performance.youtubeUrl,
+            notesMarkdown: entry.performance.notesMarkdown || undefined,
+          }
+        : null,
+  };
+}
+
+async function responsePayload(response: Response) {
+  return response.json().catch(() => null) as Promise<{
+    error?: string;
+    entry?: Record<string, unknown>;
+    entries?: Record<string, unknown>[];
+  } | null>;
+}
+
+export default function Editor({ mode, configurationStatus }: EditorProps) {
+  const [entries, setEntries] = useState<EntrySummary[]>([]);
+  const [entry, setEntry] = useState<EditorEntry>(blankEntry);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  function runBusy<T>(operation: () => Promise<T>) {
+    return runBusyEditorOperation(operation, setBusy, setMessage);
+  }
+
+  function changeEntry(changes: Partial<EditorEntry>) {
+    setEntry((current) => ({ ...current, ...changes }));
+    setDirty(true);
+  }
+
+  function changePerformance(changes: Partial<PerformanceFields>) {
+    setEntry((current) => ({
+      ...current,
+      performance: { ...current.performance, ...changes },
+    }));
+    setDirty(true);
+  }
+
+  async function loadEntries() {
+    try {
+      const response = await fetch("/api/admin/entries", { cache: "no-store" });
+      const payload = await responsePayload(response);
+      if (!response.ok) {
+        setMessage(payload?.error ?? `Could not load entries (${response.status})`);
+        return;
+      }
+      setEntries(
+        (payload?.entries ?? []).map((item) => normalizeEntry(item) as EntrySummary)
+      );
+    } catch {
+      setMessage("Network request failed");
     }
-    setChecking(false);
   }
 
   useEffect(() => {
-    loadPosts();
-  }, []);
+    if (mode === "authorized") void loadEntries();
+  }, [mode]);
 
-  async function login(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("");
-    const res = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password }),
+  async function signIn() {
+    await runBusy(async () => {
+      setMessage("");
+      await authClient.signIn.social({ provider: "github", callbackURL: "/admin" });
     });
-    if (res.status === 204) {
-      setPassword("");
-      await loadPosts();
-    } else {
-      const data = (await res.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      setStatus(data?.error ?? "login failed");
-    }
   }
 
-  async function loadPost(s: string) {
-    setStatus("");
-    setCommitUrl("");
-    const res = await fetch(`/api/admin/posts?slug=${s}`);
-    if (!res.ok) {
-      setStatus(`could not load ${s}`);
+  async function signOut() {
+    if (!shouldDiscardUnsavedChanges(dirty)) return;
+    await runBusy(async () => {
+      setMessage("");
+      await authClient.signOut();
+      window.location.assign("/admin");
+    });
+  }
+
+  async function loadEntry(id: string) {
+    if (!shouldDiscardUnsavedChanges(dirty)) return;
+    await runBusy(async () => {
+      setMessage("");
+      const response = await fetch(`/api/admin/entries/${id}`, {
+        cache: "no-store",
+      });
+      const payload = await responsePayload(response);
+      if (response.ok && payload?.entry) {
+        setEntry(normalizeEntry(payload.entry));
+        setScheduledAt(
+          formatDateTimeLocal(payload.entry.publishedAt as string | null)
+        );
+        setDirty(false);
+      } else {
+        setMessage(payload?.error ?? "Could not load entry");
+      }
+    });
+  }
+
+  async function save() {
+    await runBusy(async () => {
+      setMessage("");
+      const creating = !entry.id;
+      const response = await fetch(
+        creating ? "/api/admin/entries" : `/api/admin/entries/${entry.id}`,
+        {
+          method: creating ? "POST" : "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            creating
+              ? {
+                  slug: entry.slug,
+                  title: entry.title,
+                  kind: entry.kind,
+                  summary: entry.summary || null,
+                  bodyMarkdown: entry.bodyMarkdown,
+                  performance: mutation(entry).performance,
+                }
+              : { expectedVersion: entry.version, entry: mutation(entry) }
+          ),
+        }
+      );
+      const payload = await responsePayload(response);
+      if (response.ok && payload?.entry) {
+        setEntry(normalizeEntry(payload.entry));
+        setDirty(false);
+        setMessage(creating ? "Draft created" : "Saved");
+        await loadEntries();
+      } else {
+        setMessage(payload?.error ?? `Save failed (${response.status})`);
+      }
+    });
+  }
+
+  async function runAction(action: "publish" | "schedule" | "unpublish" | "archive" | "duplicate") {
+    if (!entry.id) {
+      setMessage("Create the draft before using this action");
       return;
     }
-    const data = (await res.json()) as {
-      frontmatter: {
-        title?: string;
-        date?: string;
-        description?: string;
-        tags?: string[];
-        draft?: boolean;
-      };
-      body: string;
-    };
-    setSlug(s);
-    setSlugTouched(true);
-    setTitle(data.frontmatter.title ?? "");
-    setDate(data.frontmatter.date ?? today());
-    setDescription(data.frontmatter.description ?? "");
-    setTags(
-      Array.isArray(data.frontmatter.tags) ? data.frontmatter.tags.join(", ") : ""
-    );
-    setDraft(data.frontmatter.draft === true);
-    setBody(data.body);
-  }
-
-  function newPost() {
-    setSlug("");
-    setSlugTouched(false);
-    setTitle("");
-    setDate(today());
-    setDescription("");
-    setTags("");
-    setDraft(true);
-    setBody("");
-    setStatus("");
-    setCommitUrl("");
-  }
-
-  async function publish() {
-    setStatus("publishing");
-    setCommitUrl("");
-    const res = await fetch("/api/admin/publish", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        slug,
-        title,
-        date,
-        description,
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        draft,
-        body,
-      }),
-    });
-    const data = (await res.json().catch(() => null)) as {
-      commitUrl?: string;
-      error?: string;
-    } | null;
-    if (res.ok && data?.commitUrl) {
-      setStatus(draft ? "committed as draft" : "published");
-      setCommitUrl(data.commitUrl);
-      await loadPosts();
-    } else {
-      setStatus(data?.error ?? `error ${res.status}`);
+    const unsavedMessage = unsavedEntryActionMessage(dirty);
+    if (unsavedMessage) {
+      setMessage(unsavedMessage);
+      return;
     }
+    if (action === "schedule" && !scheduledAt) {
+      setMessage("Choose a schedule time");
+      return;
+    }
+    const scheduleTime = parseDateTimeLocal(scheduledAt);
+    if (action === "schedule" && !scheduleTime) {
+      setMessage("Choose a valid schedule time");
+      return;
+    }
+    await runBusy(async () => {
+      setMessage("");
+      const response = await fetch(`/api/admin/entries/${entry.id}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          ...(action === "duplicate" ? {} : { expectedVersion: entry.version }),
+          ...(action === "schedule" ? { scheduledAt: scheduleTime } : {}),
+        }),
+      });
+      const payload = await responsePayload(response);
+      if (response.ok && payload?.entry) {
+        const updated = normalizeEntry(payload.entry);
+        setEntry(updated);
+        setScheduledAt(formatDateTimeLocal(updated.publishedAt));
+        setDirty(false);
+        setMessage(action === "duplicate" ? "Draft duplicated" : "Entry updated");
+        await loadEntries();
+      } else {
+        setMessage(payload?.error ?? `Action failed (${response.status})`);
+      }
+    });
   }
 
-  function onTitleChange(v: string) {
-    setTitle(v);
-    if (!slugTouched) setSlug(slugify(v));
+  async function remove() {
+    if (!entry.id) return;
+    if (!shouldDiscardUnsavedChanges(dirty)) return;
+    const confirmation = window.prompt(`Type ${entry.slug} to delete this entry`);
+    if (confirmation === null) return;
+    await runBusy(async () => {
+      setMessage("");
+      const response = await fetch(`/api/admin/entries/${entry.id}`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedVersion: entry.version, confirmation }),
+      });
+      if (response.ok) {
+        setEntry(blankEntry());
+        setScheduledAt("");
+        setDirty(false);
+        setMessage("Entry deleted");
+        await loadEntries();
+      } else {
+        const payload = await responsePayload(response);
+        setMessage(payload?.error ?? `Delete failed (${response.status})`);
+      }
+    });
   }
 
-  if (checking) return <p className="admin-note">checking session</p>;
+  function newEntry() {
+    if (!shouldDiscardUnsavedChanges(dirty)) return;
+    setEntry(blankEntry());
+    setScheduledAt("");
+    setDirty(false);
+    setMessage("");
+  }
 
-  if (!authed) {
+  if (mode === "unconfigured") {
+    const missing = configurationStatus?.missing ?? [];
+    const invalid = configurationStatus?.invalid ?? [];
     return (
-      <form onSubmit={login} className="admin-login">
+      <section className="admin-state">
         <h1>Admin</h1>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
-          autoFocus
-        />
-        <button type="submit">log in</button>
-        {status && <p className="admin-note">{status}</p>}
-        <style>{`
-          .admin-login input { font: inherit; padding: 0.375rem 0.5rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--bg); color: var(--ink); margin-right: 0.5rem; }
-          .admin-login button { font-family: var(--mono); font-size: 0.8125rem; padding: 0.375rem 0.75rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--code-bg); color: var(--ink); cursor: pointer; }
-          .admin-note { font-family: var(--mono); font-size: 0.8125rem; color: var(--muted); margin-top: 0.75rem; }
-        `}</style>
-      </form>
+        <h2>Admin configuration is incomplete</h2>
+        <p>Set the following server environment variables before using the editor.</p>
+        <ul>{[...missing, ...invalid].map((key) => <li key={key}><code>{key}</code></li>)}</ul>
+      </section>
     );
   }
+
+  if (mode === "signed-out") {
+    return (
+      <section className="admin-state">
+        <h1>Admin</h1>
+        <p>Only the configured GitHub owner can manage entries.</p>
+        <button type="button" onClick={signIn} disabled={busy}>Sign in with GitHub</button>
+        {message && <p className="admin-message">{message}</p>}
+      </section>
+    );
+  }
+
+  if (mode === "forbidden") {
+    return (
+      <section className="admin-state">
+        <h1>Admin</h1>
+        <p>This GitHub account does not match the configured owner.</p>
+        <button type="button" onClick={signOut} disabled={busy}>Sign out</button>
+        {message && <p className="admin-message" role="status">{message}</p>}
+      </section>
+    );
+  }
+
+  const deleteAllowed = entry.status === "draft" || entry.status === "archived";
 
   return (
-    <div className="admin">
-      <h1>Admin</h1>
+    <div className="admin-editor">
+      <header className="admin-header">
+        <div>
+          <h1>Admin</h1>
+          <p className="admin-meta">Raw Markdown entry administration</p>
+        </div>
+        <button type="button" onClick={signOut} disabled={busy}>Sign out</button>
+      </header>
 
-      <div className="admin-list">
-        <span className="label">Posts</span>
-        <ul>
-          {posts.map((p) => (
-            <li key={p.slug}>
-              <button onClick={() => loadPost(p.slug)}>{p.title}</button>
-              <span className="mono-note">
-                {p.date}
-                {p.draft ? " draft" : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <button className="new" onClick={newPost}>
-          new post
-        </button>
-      </div>
+      <div className="admin-layout">
+        <aside className="admin-list" aria-label="Entries">
+          <button type="button" onClick={newEntry} disabled={busy}>
+            New entry
+          </button>
+          <ul>
+            {entries.map((item) => (
+              <li key={item.id ?? item.slug}>
+                <button type="button" onClick={() => item.id && loadEntry(item.id)} disabled={busy}>
+                  <strong>{item.title}</strong>
+                  <span>{item.kind} · {item.status}</span>
+                  <span>Updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "unknown"}</span>
+                  <span>Published {item.publishedAt ? new Date(item.publishedAt).toLocaleString() : "not set"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
-      <div className="admin-fields">
-        <input
-          value={title}
-          onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="title"
-        />
-        <input
-          value={slug}
-          onChange={(e) => {
-            setSlug(e.target.value);
-            setSlugTouched(true);
-          }}
-          placeholder="slug"
-        />
-        <input
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          placeholder="YYYY-MM-DD"
-        />
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="description (excerpt)"
-        />
-        <input
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="tags, comma separated (music puts it on the music page)"
-        />
-        <label className="mono-note">
-          <input
-            type="checkbox"
-            checked={draft}
-            onChange={(e) => setDraft(e.target.checked)}
-          />{" "}
-          draft
-        </label>
-      </div>
+        <div className="admin-form">
+          <div className="admin-grid">
+            <label>Title<input value={entry.title} onChange={(event) => changeEntry({ title: event.target.value })} /></label>
+            <label>Slug<input value={entry.slug} onChange={(event) => changeEntry({ slug: event.target.value })} /></label>
+            <label>Kind<select value={entry.kind} onChange={(event) => changeEntry({ kind: event.target.value as EditorEntry["kind"] })}><option value="note">Note</option><option value="essay">Essay</option><option value="performance">Performance</option></select></label>
+            <label>Publication state<input value={entry.status} readOnly /></label>
+          </div>
+          <label>Summary<textarea rows={3} value={entry.summary} onChange={(event) => changeEntry({ summary: event.target.value })} /></label>
+          <label>Markdown<textarea className="admin-markdown" rows={20} spellCheck={false} value={entry.bodyMarkdown} onChange={(event) => changeEntry({ bodyMarkdown: event.target.value })} /></label>
 
-      <div className="admin-panes">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="markdown body"
-          spellCheck={false}
-        />
-        <div
-          className="admin-preview"
-          dangerouslySetInnerHTML={{ __html: marked.parse(body) as string }}
-        />
-      </div>
-      <p className="mono-note">
-        preview is plain markdown; MDX components will not render here
-      </p>
+          {entry.kind === "performance" && (
+            <fieldset>
+              <legend>Performance metadata</legend>
+              <div className="admin-grid">
+                <label>Work title<input value={entry.performance.workTitle} onChange={(event) => changePerformance({ workTitle: event.target.value })} /></label>
+                <label>Composer<input value={entry.performance.composer} onChange={(event) => changePerformance({ composer: event.target.value })} /></label>
+                <label>Venue<input value={entry.performance.venue} onChange={(event) => changePerformance({ venue: event.target.value })} /></label>
+                <label>Performed at<input type="datetime-local" value={entry.performance.performedAt} onChange={(event) => changePerformance({ performedAt: event.target.value })} /></label>
+              </div>
+              <label>YouTube URL<input value={entry.performance.youtubeUrl} onChange={(event) => changePerformance({ youtubeUrl: event.target.value })} /></label>
+              <label>Performance notes<textarea rows={5} value={entry.performance.notesMarkdown} onChange={(event) => changePerformance({ notesMarkdown: event.target.value })} /></label>
+            </fieldset>
+          )}
 
-      <div className="admin-actions">
-        <button onClick={publish} disabled={!slug || !title}>
-          {draft ? "commit draft" : "publish"}
-        </button>
-        {status && <span className="mono-note">{status}</span>}
-        {commitUrl && (
-          <a className="mono-note" href={commitUrl}>
-            view commit
-          </a>
-        )}
+          <div className="admin-actions">
+            <button type="button" onClick={save} disabled={busy || !entry.slug || !entry.title}>Save</button>
+            <button type="button" onClick={() => runAction("publish")} disabled={busy || !entry.id}>Publish now</button>
+            <label>Schedule time<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></label>
+            <button type="button" onClick={() => runAction("schedule")} disabled={busy || !entry.id || !scheduledAt}>Schedule</button>
+            <button type="button" onClick={() => runAction("unpublish")} disabled={busy || !entry.id}>Unpublish</button>
+            <button type="button" onClick={() => runAction("archive")} disabled={busy || !entry.id}>Archive</button>
+            <button type="button" onClick={() => runAction("duplicate")} disabled={busy || !entry.id}>Duplicate</button>
+            <button type="button" onClick={remove} disabled={busy || !entry.id || !deleteAllowed}>Delete</button>
+          </div>
+          <p className="admin-meta">Version {entry.version || "new"}{dirty ? " · Unsaved changes" : ""}{entry.updatedAt ? ` · Updated ${new Date(entry.updatedAt).toLocaleString()}` : ""}{entry.publishedAt ? ` · Publishes ${new Date(entry.publishedAt).toLocaleString()}` : ""}</p>
+          {message && <p className="admin-message" role="status">{message}</p>}
+        </div>
       </div>
 
       <style>{`
-        .admin input, .admin textarea { font: inherit; padding: 0.375rem 0.5rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--bg); color: var(--ink); }
-        .admin-fields { display: flex; flex-direction: column; gap: 0.5rem; margin-block: 1.25rem; }
-        .admin-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .admin-panes textarea { min-height: 24rem; font-family: var(--mono); font-size: 0.875rem; line-height: 1.6; resize: vertical; }
-        .admin-preview { border: 1px solid var(--hairline); border-radius: 4px; padding: 0.75rem 1rem; overflow-y: auto; max-height: 32rem; }
-        .admin button { font-family: var(--mono); font-size: 0.8125rem; padding: 0.375rem 0.75rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--code-bg); color: var(--ink); cursor: pointer; }
-        .admin button:disabled { opacity: 0.4; cursor: default; }
-        .admin-list ul { list-style: none; margin-block: 0.5rem; }
-        .admin-list li { display: flex; gap: 0.75rem; align-items: baseline; padding-block: 0.25rem; }
-        .admin-list li button { border: none; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
-        .mono-note { font-family: var(--mono); font-size: 0.8125rem; color: var(--muted); }
-        .admin-actions { display: flex; gap: 1rem; align-items: baseline; margin-top: 1rem; }
-        @media (max-width: 700px) { .admin-panes { grid-template-columns: 1fr; } }
+        .admin-state { max-width: 36rem; }
+        .admin-state h2 { margin-top: 1.5rem; }
+        .admin-state ul { margin: 1rem 0 1.5rem 1.25rem; }
+        .admin-editor button, .admin-state button { font: 0.8125rem var(--mono); padding: 0.45rem 0.7rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--code-bg); color: var(--ink); cursor: pointer; }
+        .admin-editor button:disabled, .admin-state button:disabled { opacity: 0.45; cursor: default; }
+        .admin-header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+        .admin-layout { display: grid; grid-template-columns: minmax(13rem, 0.7fr) minmax(0, 2fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .admin-list { border-right: 1px solid var(--hairline); padding-right: 1rem; }
+        .admin-list ul { list-style: none; margin-top: 0.75rem; }
+        .admin-list li + li { border-top: 1px solid var(--hairline); }
+        .admin-list li button { width: 100%; border: 0; background: transparent; text-align: left; padding: 0.65rem 0; display: grid; gap: 0.15rem; }
+        .admin-list li span, .admin-meta { color: var(--muted); font: 0.75rem var(--mono); }
+        .admin-form { min-width: 0; display: grid; gap: 0.85rem; }
+        .admin-form label { display: grid; gap: 0.3rem; font: 0.75rem var(--mono); color: var(--muted); }
+        .admin-form input, .admin-form select, .admin-form textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--hairline); border-radius: 4px; padding: 0.5rem 0.6rem; }
+        .admin-form input[readonly] { background: var(--code-bg); }
+        .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+        .admin-markdown { font-family: var(--mono) !important; line-height: 1.55; resize: vertical; }
+        .admin-form fieldset { display: grid; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--hairline); border-radius: 4px; }
+        .admin-form legend { padding-inline: 0.35rem; font: 0.75rem var(--mono); color: var(--muted); }
+        .admin-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 0.55rem; padding-top: 0.35rem; }
+        .admin-actions label { min-width: 13rem; }
+        .admin-message { font: 0.8125rem var(--mono); color: var(--accent); }
+        @media (max-width: 760px) { .admin-layout { grid-template-columns: 1fr; } .admin-list { border-right: 0; border-bottom: 1px solid var(--hairline); padding: 0 0 1rem; } .admin-grid { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );

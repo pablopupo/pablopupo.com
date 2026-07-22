@@ -1,5 +1,6 @@
+import fs from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
+import { PGlite } from "@electric-sql/pglite";
 import { createMigratedDatabase, getMigrationFiles } from "./test-database";
 
 const clients: PGlite[] = [];
@@ -15,6 +16,43 @@ afterEach(async () => {
 });
 
 describe("content schema migrations", () => {
+  it("backfills revision slugs when upgrading an existing database", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(2);
+    const client = new PGlite();
+    clients.push(client);
+
+    await client.exec(fs.readFileSync(migrationFiles[0]!, "utf8"));
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO entries (slug, title, body_markdown)
+       VALUES ('existing-entry', 'Existing entry', 'Body')
+       RETURNING id`
+    );
+    await client.query(
+      `INSERT INTO entry_revisions
+         (entry_id, revision_number, title, body_markdown)
+       VALUES
+         ($1, 1, 'Existing entry', 'Body'),
+         ($1, 3, 'Existing entry, revised', 'Revised body')`,
+      [inserted.rows[0]!.id]
+    );
+
+    await client.exec(fs.readFileSync(migrationFiles[1]!, "utf8"));
+
+    const revisions = await client.query<{ slug: string; revision_number: number }>(
+      `SELECT slug, revision_number FROM entry_revisions ORDER BY revision_number`
+    );
+    expect(revisions.rows).toEqual([
+      { slug: "existing-entry", revision_number: 1 },
+      { slug: "existing-entry", revision_number: 3 },
+    ]);
+    const upgraded = await client.query<{ version: number }>(
+      `SELECT version FROM entries WHERE id = $1`,
+      [inserted.rows[0]!.id]
+    );
+    expect(upgraded.rows).toEqual([{ version: 3 }]);
+  });
+
   it("creates every approved content table from generated SQL", async () => {
     expect(getMigrationFiles(), "generated SQL migrations").not.toHaveLength(0);
     const client = await migratedDatabase();
@@ -28,6 +66,7 @@ describe("content schema migrations", () => {
     );
 
     expect(result.rows.map((row) => row.table_name)).toEqual([
+      "account",
       "analytics_daily_aggregates",
       "analytics_events",
       "comments",
@@ -41,8 +80,54 @@ describe("content schema migrations", () => {
       "project_links",
       "project_technologies",
       "projects",
+      "session",
       "site_settings",
+      "user",
+      "verification",
     ]);
+  });
+
+  it("creates Better Auth records and complete optimistic entry snapshots", async () => {
+    expect(getMigrationFiles(), "generated SQL migrations").not.toHaveLength(0);
+    const client = await migratedDatabase();
+    if (!client) return;
+
+    const columns = await client.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+    }>(
+      `SELECT table_name, column_name, data_type
+       FROM information_schema.columns
+       WHERE table_name IN ('user', 'session', 'account', 'verification', 'entries', 'entry_revisions')
+       ORDER BY table_name, ordinal_position`
+    );
+    const names = columns.rows.map(
+      (column) => `${column.table_name}.${column.column_name}`
+    );
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "user.id",
+        "user.email",
+        "session.token",
+        "session.user_id",
+        "account.account_id",
+        "account.provider_id",
+        "account.user_id",
+        "verification.identifier",
+        "verification.expires_at",
+        "entries.version",
+        "entry_revisions.slug",
+        "entry_revisions.performance_details",
+      ])
+    );
+
+    const entryVersion = columns.rows.find(
+      (column) =>
+        column.table_name === "entries" && column.column_name === "version"
+    );
+    expect(entryVersion?.data_type).toBe("integer");
   });
 
   it("uses UUID defaults, timezone-aware timestamps, enums, and useful indexes", async () => {
@@ -169,8 +254,8 @@ describe("content schema migrations", () => {
     );
     await client.query(
       `INSERT INTO entry_revisions
-         (entry_id, revision_number, title, body_markdown)
-       VALUES ($1, 1, 'Cleanup', 'Original')`,
+         (entry_id, revision_number, slug, title, body_markdown)
+       VALUES ($1, 1, 'cleanup-entry', 'Cleanup', 'Original')`,
       [entryId]
     );
     await client.query(

@@ -13,7 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.6.24",
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "1.6.24",
     "d3-force": "^3.0.0",
     "drizzle-orm": "^0.45.2",
     "gray-matter": "^4.0.3",

@@ -63,12 +63,96 @@ export type AnalyticsEventProperties = {
   utmTerm?: string;
 };
 
+export type EntryPerformanceDetailsSnapshot = {
+  workTitle: string;
+  composer: string;
+  venue: string | null;
+  performedAt: string | null;
+  youtubeUrl: string;
+  notesMarkdown: string | null;
+};
+
 function timestamps() {
   return {
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   };
 }
+
+export const user = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    image: text("image"),
+    ...timestamps(),
+  },
+  (table) => [uniqueIndex("user_email_unique").on(table.email)]
+);
+
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    token: text("token").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("session_token_unique").on(table.token),
+    index("session_user_id_idx").on(table.userId),
+  ]
+);
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    ...timestamps(),
+  },
+  (table) => [
+    index("account_user_id_idx").on(table.userId),
+    uniqueIndex("account_provider_account_unique").on(
+      table.providerId,
+      table.accountId
+    ),
+  ]
+);
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ...timestamps(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)]
+);
 
 export const media = pgTable(
   "media",
@@ -127,6 +211,7 @@ export const entries = pgTable(
       onDelete: "set null",
     }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    version: integer("version").default(1).notNull(),
     ...timestamps(),
   },
   (table) => [
@@ -137,6 +222,7 @@ export const entries = pgTable(
       "entries_publication_timestamp_check",
       sql`${table.status} NOT IN ('scheduled', 'published') OR ${table.publishedAt} IS NOT NULL`
     ),
+    check("entries_version_positive_check", sql`${table.version} > 0`),
   ]
 );
 
@@ -166,12 +252,14 @@ export const entryRevisions = pgTable(
       .notNull()
       .references(() => entries.id, { onDelete: "cascade" }),
     revisionNumber: integer("revision_number").notNull(),
+    slug: text("slug").notNull(),
     kind: entryKind("kind").default("note").notNull(),
     status: contentStatus("status").default("draft").notNull(),
     title: text("title").notNull(),
     summary: text("summary"),
     bodyMarkdown: text("body_markdown").notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    performanceDetails: jsonb("performance_details").$type<EntryPerformanceDetailsSnapshot>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
