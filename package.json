@@ -4,25 +4,34 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "db:generate": "drizzle-kit generate",
+    "db:import": "tsx scripts/import-legacy.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
     "start": "next start",
     "graph": "node scripts/build-graph.mjs",
     "prebuild": "node scripts/build-graph.mjs",
     "test": "vitest run"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "d3-force": "^3.0.0",
+    "drizzle-orm": "^0.45.2",
     "gray-matter": "^4.0.3",
     "marked": "^18.0.6",
     "next": "^16.2.10",
     "next-mdx-remote": "^6.0.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^26.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }
