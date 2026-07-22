@@ -15,6 +15,13 @@
       "when": 1784734354713,
       "tag": "0001_chemical_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784738187270,
+      "tag": "0002_sharp_blob",
+      "breakpoints": true
     }
   ]
 }

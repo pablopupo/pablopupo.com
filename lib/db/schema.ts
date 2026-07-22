@@ -23,6 +23,7 @@ export const contentStatus = pgEnum("content_status", [
   "archived",
 ]);
 export const entryKind = pgEnum("entry_kind", ["note", "essay", "performance"]);
+export const entrySection = pgEnum("entry_section", ["writing", "music"]);
 export const projectKind = pgEnum("project_kind", ["project", "experience"]);
 export const projectLinkKind = pgEnum("project_link_kind", [
   "repository",
@@ -203,6 +204,8 @@ export const entries = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     slug: text("slug").notNull(),
     kind: entryKind("kind").default("note").notNull(),
+    section: entrySection("section").default("writing").notNull(),
+    tags: text("tags").array().default(sql`ARRAY[]::text[]`).notNull(),
     status: contentStatus("status").default("draft").notNull(),
     title: text("title").notNull(),
     summary: text("summary"),
@@ -254,6 +257,8 @@ export const entryRevisions = pgTable(
     revisionNumber: integer("revision_number").notNull(),
     slug: text("slug").notNull(),
     kind: entryKind("kind").default("note").notNull(),
+    section: entrySection("section").default("writing").notNull(),
+    tags: text("tags").array().default(sql`ARRAY[]::text[]`).notNull(),
     status: contentStatus("status").default("draft").notNull(),
     title: text("title").notNull(),
     summary: text("summary"),

@@ -1,9 +1,14 @@
 import { z } from "zod";
-import { entryMutationSchema, type EntryMutation } from "../db/validation";
+import {
+  entryMutationSchema,
+  entryTagsSchema,
+  type EntryMutation,
+} from "../db/validation";
 import {
   EntryConflictError,
   EntryNotFoundError,
   EntryStateError,
+  RevisionNotFoundError,
 } from "./repository";
 
 const createDraftSchema = z
@@ -15,6 +20,8 @@ const createDraftSchema = z
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     title: z.string().trim().min(1).max(200),
     kind: z.enum(["note", "essay", "performance"]).default("note"),
+    section: z.enum(["writing", "music"]).optional(),
+    tags: entryTagsSchema.default([]),
     summary: z.string().trim().max(500).nullable().optional(),
     bodyMarkdown: z.string().max(250_000).default(""),
     performance: z.unknown().nullable().optional(),
@@ -47,6 +54,10 @@ const deleteSchema = z
   })
   .strict();
 const entryIdSchema = z.uuid();
+const revisionNumberSchema = z.coerce.number().int().positive();
+const restoreRevisionSchema = z
+  .object({ expectedVersion: z.number().int().positive() })
+  .strict();
 
 type AdminAccess =
   | { status: "unconfigured" }
@@ -60,11 +71,21 @@ type AdminEntryRepository = {
     slug: string;
     title: string;
     kind?: "note" | "essay" | "performance";
+    section?: "writing" | "music";
+    tags?: string[];
     summary?: string | null;
     bodyMarkdown?: string;
     performance?: EntryMutation["performance"];
   }, now?: Date) => Promise<unknown>;
   getEntry: (id: string) => Promise<{ slug: string } | undefined>;
+  listRevisions: (id: string) => Promise<unknown>;
+  getRevision: (id: string, revisionNumber: number) => Promise<unknown | undefined>;
+  restoreRevision: (
+    id: string,
+    revisionNumber: number,
+    expectedVersion: number,
+    now?: Date
+  ) => Promise<unknown>;
   updateEntry: (
     id: string,
     expectedVersion: number,
@@ -131,6 +152,9 @@ function repositoryErrorResponse(error: unknown) {
   if (error instanceof EntryNotFoundError) {
     return Response.json({ error: "entry not found" }, { status: 404 });
   }
+  if (error instanceof RevisionNotFoundError) {
+    return Response.json({ error: "revision not found" }, { status: 404 });
+  }
   if (typeof error === "object" && error && "code" in error && error.code === "23505") {
     return Response.json({ error: "slug is already in use" }, { status: 422 });
   }
@@ -166,6 +190,9 @@ export function createAdminEntryHandlers(dependencies: AdminEntryHandlerDependen
       if (!draft.success) return validationResponse(draft.error);
       const entry = entryMutationSchema.safeParse({
         ...draft.data,
+        section:
+          draft.data.section ??
+          (draft.data.kind === "performance" ? "music" : "writing"),
         status: "draft",
         publishedAt: null,
       });
@@ -190,6 +217,60 @@ export function createAdminEntryHandlers(dependencies: AdminEntryHandlerDependen
       const entry = await dependencies.repository.getEntry(id);
       if (!entry) return Response.json({ error: "entry not found" }, { status: 404 });
       return Response.json({ entry });
+    },
+
+    async revisions(request: Request, id: string) {
+      const rejection = await authorize(request, false);
+      if (rejection) return rejection;
+      const invalidId = entryIdValidationResponse(id);
+      if (invalidId) return invalidId;
+      return Response.json({
+        revisions: await dependencies.repository.listRevisions(id),
+      });
+    },
+
+    async revision(request: Request, id: string, revisionNumber: string) {
+      const rejection = await authorize(request, false);
+      if (rejection) return rejection;
+      const invalidId = entryIdValidationResponse(id);
+      if (invalidId) return invalidId;
+      const parsedRevision = revisionNumberSchema.safeParse(revisionNumber);
+      if (!parsedRevision.success) return validationResponse(parsedRevision.error);
+      const revision = await dependencies.repository.getRevision(
+        id,
+        parsedRevision.data
+      );
+      if (!revision) {
+        return Response.json({ error: "revision not found" }, { status: 404 });
+      }
+      return Response.json({ revision });
+    },
+
+    async restoreRevision(
+      request: Request,
+      id: string,
+      revisionNumber: string
+    ) {
+      const rejection = await authorize(request, true);
+      if (rejection) return rejection;
+      const invalidId = entryIdValidationResponse(id);
+      if (invalidId) return invalidId;
+      const parsedRevision = revisionNumberSchema.safeParse(revisionNumber);
+      if (!parsedRevision.success) return validationResponse(parsedRevision.error);
+      const restoration = restoreRevisionSchema.safeParse(await parseJson(request));
+      if (!restoration.success) return validationResponse(restoration.error);
+      try {
+        const entry = await dependencies.repository.restoreRevision(
+          id,
+          parsedRevision.data,
+          restoration.data.expectedVersion,
+          dependencies.now()
+        );
+        dependencies.revalidate();
+        return Response.json({ entry });
+      } catch (error) {
+        return repositoryErrorResponse(error);
+      }
     },
 
     async update(request: Request, id: string) {

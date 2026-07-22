@@ -13,22 +13,24 @@ const links = [
 
 export default function Nav() {
   const pathname = usePathname();
+  const NavigationLink =
+    pathname === "/admin" || pathname.startsWith("/admin/") ? "a" : Link;
 
   return (
     <nav>
       {pathname !== "/" && (
-        <Link href="/" className="wordmark">
+        <NavigationLink href="/" className="wordmark">
           Pablo Pupo
-        </Link>
+        </NavigationLink>
       )}
       {links.map(([href, label]) => (
-        <Link
+        <NavigationLink
           key={href}
           href={href}
           aria-current={pathname.startsWith(href) ? "page" : undefined}
         >
           {label}
-        </Link>
+        </NavigationLink>
       ))}
     </nav>
   );

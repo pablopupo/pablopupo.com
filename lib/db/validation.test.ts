@@ -10,6 +10,8 @@ import {
 const note = {
   slug: "small-note",
   kind: "note" as const,
+  section: "writing" as const,
+  tags: [] as string[],
   status: "draft" as const,
   title: "Small note",
   bodyMarkdown: "Body",
@@ -37,6 +39,45 @@ const project = {
 describe("entryMutationSchema", () => {
   it("accepts a portable Markdown note", () => {
     expect(entryMutationSchema.parse(note)).toMatchObject(note);
+  });
+
+  it("normalizes ordered tags and rejects empty, duplicate, or oversized tags", () => {
+    expect(
+      entryMutationSchema.parse({
+        ...note,
+        section: "music",
+        tags: [" Music ", "Live performance"],
+      })
+    ).toMatchObject({ section: "music", tags: ["Music", "Live performance"] });
+    for (const tags of [
+      ["Music", " music "],
+      [""],
+      Array.from({ length: 21 }, (_, index) => `tag-${index}`),
+      ["x".repeat(51)],
+    ]) {
+      expect(entryMutationSchema.safeParse({ ...note, tags }).success).toBe(false);
+    }
+  });
+
+  it("validates constrained embeds and durable Markdown image URLs", () => {
+    expect(
+      entryMutationSchema.safeParse({
+        ...note,
+        bodyMarkdown:
+          '<kbd>HTML</kbd>\n\n::youtube{id="M7lc1UVf-VE" title="Demo"}\n\n![Score](/images/score.webp)',
+      }).success
+    ).toBe(true);
+    for (const bodyMarkdown of [
+      '::youtube{id="too-short"}',
+      '::youtube{id="M7lc1UVf-VE" src="https://evil.example/embed"}',
+      '<iframe src="https://www.youtube.com/embed/M7lc1UVf-VE"></iframe>',
+      '![Temporary](blob:https://example.com/id)',
+      '![Executable](javascript:alert(1))',
+    ]) {
+      expect(entryMutationSchema.safeParse({ ...note, bodyMarkdown }).success).toBe(
+        false
+      );
+    }
   });
 
   it.each(["Uppercase", "two words", "-leading", "trailing-", "has_underscore"])(

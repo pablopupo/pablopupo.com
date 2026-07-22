@@ -1,28 +1,89 @@
 import fs from "node:fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { createMigratedDatabase, getMigrationFiles } from "./test-database";
+import {
+  getMigrationFiles,
+  PGLITE_TEST_TIMEOUT_MS,
+} from "./test-database";
 
-const clients: PGlite[] = [];
+let sharedClient: PGlite | undefined;
+let appliedMigrationCount = 0;
 
-async function migratedDatabase(): Promise<PGlite | undefined> {
-  const client = await createMigratedDatabase();
-  if (client) clients.push(client);
-  return client;
+async function prepareDatabase(migrationCount: number) {
+  if (!sharedClient) throw new Error("Test database is unavailable");
+  const migrationFiles = getMigrationFiles();
+  await sharedClient.exec("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
+  for (const migrationFile of migrationFiles.slice(0, migrationCount)) {
+    await sharedClient.exec(fs.readFileSync(migrationFile, "utf8"));
+  }
+  appliedMigrationCount = migrationCount;
+  return sharedClient;
 }
 
-afterEach(async () => {
-  await Promise.all(clients.splice(0).map((client) => client.close()));
+async function migratedDatabase(): Promise<PGlite | undefined> {
+  const migrationCount = getMigrationFiles().length;
+  if (appliedMigrationCount !== migrationCount) {
+    await prepareDatabase(migrationCount);
+  }
+  return sharedClient;
+}
+
+beforeAll(async () => {
+  sharedClient = new PGlite();
 });
 
-describe("content schema migrations", () => {
+afterAll(async () => {
+  await sharedClient?.close();
+}, PGLITE_TEST_TIMEOUT_MS);
+
+describe.sequential("content schema migrations", () => {
+  it("backfills sections and tags when upgrading a Task 2 database", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(3);
+    const client = await prepareDatabase(2);
+
+    const inserted = await client.query<{ id: string; kind: string }>(
+      `INSERT INTO entries (slug, kind, title, body_markdown)
+       VALUES
+         ('existing-note', 'note', 'Existing note', 'Note body'),
+         ('existing-essay', 'essay', 'Existing essay', 'Essay body'),
+         ('existing-performance', 'performance', 'Existing performance', 'Performance body')
+       RETURNING id, kind`
+    );
+    for (const entry of inserted.rows) {
+      await client.query(
+        `INSERT INTO entry_revisions
+           (entry_id, revision_number, slug, kind, title, body_markdown)
+         VALUES ($1, 1, $2, $3::entry_kind, $4, 'Snapshot body')`,
+        [entry.id, `existing-${entry.kind}`, entry.kind, `Existing ${entry.kind}`]
+      );
+    }
+
+    await client.exec(fs.readFileSync(migrationFiles[2]!, "utf8"));
+
+    const entries = await client.query<{
+      kind: string;
+      section: string;
+      tags: string[];
+    }>(`SELECT kind, section, tags FROM entries ORDER BY kind::text`);
+    expect(entries.rows).toEqual([
+      { kind: "essay", section: "writing", tags: [] },
+      { kind: "note", section: "writing", tags: [] },
+      { kind: "performance", section: "music", tags: [] },
+    ]);
+    const revisions = await client.query<{
+      kind: string;
+      section: string;
+      tags: string[];
+    }>(`SELECT kind, section, tags FROM entry_revisions ORDER BY kind::text`);
+    expect(revisions.rows).toEqual(entries.rows);
+  });
+
   it("backfills revision slugs when upgrading an existing database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(2);
-    const client = new PGlite();
-    clients.push(client);
+    expect(migrationFiles).toHaveLength(3);
+    const client = await prepareDatabase(1);
 
-    await client.exec(fs.readFileSync(migrationFiles[0]!, "utf8"));
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO entries (slug, title, body_markdown)
        VALUES ('existing-entry', 'Existing entry', 'Body')
@@ -352,4 +413,4 @@ describe("content schema migrations", () => {
       utmSource: "newsletter",
     });
   });
-});
+}, PGLITE_TEST_TIMEOUT_MS);

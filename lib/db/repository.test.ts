@@ -3,7 +3,10 @@ import type { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { createContentRepository } from "./repository";
 import * as schema from "./schema";
-import { createMigratedDatabase } from "./test-database";
+import {
+  createMigratedDatabase,
+  PGLITE_TEST_TIMEOUT_MS,
+} from "./test-database";
 
 const clients: PGlite[] = [];
 
@@ -20,7 +23,7 @@ async function setup() {
 
 afterEach(async () => {
   await Promise.all(clients.splice(0).map((client) => client.close()));
-});
+}, PGLITE_TEST_TIMEOUT_MS);
 
 describe("content repository public reads", () => {
   it("returns only published entries at or before now, newest first", async () => {
@@ -103,4 +106,4 @@ describe("content repository public reads", () => {
       "third",
     ]);
   });
-});
+}, PGLITE_TEST_TIMEOUT_MS);

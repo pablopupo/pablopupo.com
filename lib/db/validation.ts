@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { analyzeAuthoringMarkdown } from "../markdown/youtube";
 
 const slugSchema = z
   .string()
@@ -43,6 +44,23 @@ const youtubeUrlSchema = safeHttpUrlSchema.refine(
 
 const publicationStatusSchema = z.enum(["draft", "scheduled", "published", "archived"]);
 const publicationDateSchema = z.coerce.date().nullable().optional();
+export const entryTagsSchema = z
+  .array(z.string().trim().min(1).max(50))
+  .max(20)
+  .superRefine((tags, context) => {
+    const seen = new Set<string>();
+    tags.forEach((tag, index) => {
+      const key = tag.toLowerCase();
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: [index],
+          message: "Entry tags must be unique",
+        });
+      }
+      seen.add(key);
+    });
+  });
 
 function validatePublication(
   value: { status: z.infer<typeof publicationStatusSchema>; publishedAt?: Date | null },
@@ -95,6 +113,8 @@ export const entryMutationSchema = z
   .object({
     slug: slugSchema,
     kind: z.enum(["note", "essay", "performance"]),
+    section: z.enum(["writing", "music"]),
+    tags: entryTagsSchema,
     status: publicationStatusSchema,
     title: z.string().trim().min(1).max(200),
     summary: z.string().trim().max(500).nullable().optional(),
@@ -105,6 +125,13 @@ export const entryMutationSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    for (const issue of analyzeAuthoringMarkdown(value.bodyMarkdown).issues) {
+      context.addIssue({
+        code: "custom",
+        path: ["bodyMarkdown"],
+        message: issue,
+      });
+    }
     validatePublication(value, context);
     if (value.kind === "performance" && !value.performance) {
       context.addIssue({

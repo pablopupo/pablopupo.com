@@ -3,8 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Editor, {
   formatDateTimeLocal,
   parseDateTimeLocal,
+  parseTagInput,
+  nextDocumentGeneration,
   runBusyEditorOperation,
   shouldDiscardUnsavedChanges,
+  shouldRestoreRevision,
   unsavedEntryActionMessage,
 } from "./editor";
 
@@ -13,6 +16,7 @@ const originalTimeZone = process.env.TZ;
 afterEach(() => {
   if (originalTimeZone === undefined) delete process.env.TZ;
   else process.env.TZ = originalTimeZone;
+  vi.unstubAllGlobals();
 });
 
 describe("admin editor behavior", () => {
@@ -56,6 +60,49 @@ describe("admin editor behavior", () => {
     expect(setBusy.mock.calls).toEqual([[true], [false]]);
     expect(onError).toHaveBeenCalledWith("Network request failed");
   });
+
+  it("holds busy state until a pending fetch response settles", async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    const response = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(response));
+    const busyStates: boolean[] = [];
+
+    const operation = runBusyEditorOperation(
+      async () => (await fetch("https://example.com/api/admin/entries")).status,
+      (busy) => busyStates.push(busy),
+      vi.fn()
+    );
+
+    expect(busyStates).toEqual([true]);
+    resolveResponse?.(new Response(null, { status: 204 }));
+    await expect(operation).resolves.toBe(204);
+    expect(busyStates).toEqual([true, false]);
+  });
+
+  it("keeps raw tag input editable while producing normalized mutation tags", () => {
+    expect(parseTagInput("")).toEqual([]);
+    expect(parseTagInput("Music,")).toEqual(["Music"]);
+    expect(parseTagInput(" Music, Live performance , ")).toEqual([
+      "Music",
+      "Live performance",
+    ]);
+  });
+
+  it("bumps the editor document generation only for replacement content", () => {
+    expect(nextDocumentGeneration(4, false)).toBe(4);
+    expect(nextDocumentGeneration(4, true)).toBe(5);
+  });
+
+  it("requires explicit confirmation before restoring a revision", () => {
+    const confirmRestore = vi.fn().mockReturnValue(false);
+
+    expect(shouldRestoreRevision(7, confirmRestore)).toBe(false);
+    expect(confirmRestore).toHaveBeenCalledWith(
+      "Restore revision 7? Current content will become a new revision."
+    );
+  });
 });
 
 describe("admin editor states", () => {
@@ -91,7 +138,7 @@ describe("admin editor states", () => {
     expect(html).toContain("Sign out");
   });
 
-  it("renders raw Markdown fields and every entry workflow for the owner", () => {
+  it("renders section, tags, rich/raw Markdown, and every entry workflow for the owner", () => {
     const html = renderToStaticMarkup(<Editor mode="authorized" />);
 
     for (const label of [
@@ -100,7 +147,11 @@ describe("admin editor states", () => {
       "Slug",
       "Summary",
       "Kind",
-      "Markdown",
+      "Section",
+      "Tags",
+      "Rich Markdown",
+      "Raw Markdown",
+      "Loading rich editor",
       "Save",
       "Publish now",
       "Schedule",

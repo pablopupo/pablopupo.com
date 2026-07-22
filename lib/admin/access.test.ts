@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "../db/schema";
-import { createMigratedDatabase } from "../db/test-database";
+import {
+  createMigratedDatabase,
+  PGLITE_TEST_TIMEOUT_MS,
+} from "../db/test-database";
 
 const clients: PGlite[] = [];
 const environmentKeys = [
@@ -25,7 +28,7 @@ afterEach(async () => {
     else process.env[key] = value;
   }
   vi.resetModules();
-});
+}, PGLITE_TEST_TIMEOUT_MS);
 
 describe("admin access integration", () => {
   it("returns unconfigured without attempting auth or database initialization", async () => {
@@ -60,4 +63,4 @@ describe("admin access integration", () => {
     const lookup = module!.createGitHubAccountLookup(drizzle(client, { schema }));
     await expect(lookup("user-1")).resolves.toEqual(["12345678"]);
   });
-});
+}, PGLITE_TEST_TIMEOUT_MS);

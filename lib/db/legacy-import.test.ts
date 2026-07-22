@@ -7,7 +7,10 @@ import {
   parseLegacyPost,
 } from "./legacy-import";
 import * as schema from "./schema";
-import { createMigratedDatabase } from "./test-database";
+import {
+  createMigratedDatabase,
+  PGLITE_TEST_TIMEOUT_MS,
+} from "./test-database";
 
 const clients: PGlite[] = [];
 
@@ -21,7 +24,7 @@ async function setup() {
 
 afterEach(async () => {
   await Promise.all(clients.splice(0).map((client) => client.close()));
-});
+}, PGLITE_TEST_TIMEOUT_MS);
 
 describe("legacy content conversion", () => {
   it("converts MDX frontmatter to portable Markdown without publishing drafts", () => {
@@ -31,6 +34,9 @@ title: Draft post
 date: "2026-07-02"
 description: Still private
 draft: true
+tags:
+  - TypeScript
+  - music
 ---
 
 # Markdown body`,
@@ -52,12 +58,16 @@ Portable body`,
       title: "Draft post",
       summary: "Still private",
       bodyMarkdown: "\n# Markdown body",
+      section: "music",
+      tags: ["TypeScript", "music"],
     });
     expect(publicPost).toMatchObject({
       slug: "public-post",
       status: "published",
       title: "Public post",
       bodyMarkdown: "\nPortable body",
+      section: "writing",
+      tags: [],
     });
     expect(publicPost.publishedAt).toEqual(new Date("2026-07-01T00:00:00.000Z"));
   });
@@ -147,4 +157,4 @@ describe("legacy content import", () => {
       },
     ]);
   });
-});
+}, PGLITE_TEST_TIMEOUT_MS);

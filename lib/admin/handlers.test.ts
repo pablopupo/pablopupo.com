@@ -36,6 +36,14 @@ function dependencies(overrides: Record<string, unknown> = {}) {
         performance: null,
       }),
       updateEntry: vi.fn().mockResolvedValue({ id: entryId, version: 2 }),
+      listRevisions: vi.fn().mockResolvedValue([
+        { revisionNumber: 1, status: "draft" },
+      ]),
+      getRevision: vi.fn().mockResolvedValue({
+        revisionNumber: 1,
+        title: "Entry one",
+      }),
+      restoreRevision: vi.fn().mockResolvedValue({ id: entryId, version: 2 }),
       transitionEntry: vi.fn().mockResolvedValue({ id: entryId, version: 2 }),
       duplicateEntry: vi.fn().mockResolvedValue({ id: "entry-copy", version: 1 }),
       deleteEntry: vi.fn().mockResolvedValue(true),
@@ -80,6 +88,30 @@ describe("admin entry handler authorization", () => {
     expect(response.status).toBe(403);
     expect(deps.repository.createDraft).not.toHaveBeenCalled();
   });
+
+  it("protects revision reads and requires same-origin restore", async () => {
+    const forbidden = await setupHandlers({
+      authorize: vi.fn().mockResolvedValue({ status: "forbidden" }),
+    });
+    expect((await forbidden.handlers.revisions(request("GET"), entryId)).status).toBe(
+      403
+    );
+    expect(forbidden.deps.repository.listRevisions).not.toHaveBeenCalled();
+
+    const crossOrigin = await setupHandlers({
+      isSameOrigin: vi.fn().mockReturnValue(false),
+    });
+    expect(
+      (
+        await crossOrigin.handlers.restoreRevision(
+          request("POST", { expectedVersion: 1 }, "https://evil.example"),
+          entryId,
+          "1"
+        )
+      ).status
+    ).toBe(403);
+    expect(crossOrigin.deps.repository.restoreRevision).not.toHaveBeenCalled();
+  });
 });
 
 describe("admin entry handler status mapping", () => {
@@ -100,6 +132,45 @@ describe("admin entry handler status mapping", () => {
     expect(response.status).toBe(422);
   });
 
+  it("rejects unsafe Markdown when creating a draft", async () => {
+    const { deps, handlers } = await setupHandlers();
+
+    const response = await handlers.create(
+      request("POST", {
+        slug: "unsafe-draft",
+        title: "Unsafe draft",
+        bodyMarkdown:
+          '<iframe src="https://www.youtube.com/embed/M7lc1UVf-VE"></iframe>',
+      })
+    );
+
+    expect(response.status).toBe(422);
+    expect(deps.repository.createDraft).not.toHaveBeenCalled();
+  });
+
+  it("defaults an omitted performance section to music", async () => {
+    const { deps, handlers } = await setupHandlers();
+
+    const response = await handlers.create(
+      request("POST", {
+        slug: "performance-draft",
+        kind: "performance",
+        title: "Performance draft",
+        performance: {
+          workTitle: "Etude",
+          composer: "Chopin",
+          youtubeUrl: "https://youtu.be/M7lc1UVf-VE",
+        },
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(deps.repository.createDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ section: "music", tags: [] }),
+      expect.any(Date)
+    );
+  });
+
   it("returns 409 for an optimistic version conflict", async () => {
     const deps = dependencies();
     deps.repository.updateEntry.mockRejectedValue(
@@ -115,6 +186,8 @@ describe("admin entry handler status mapping", () => {
         entry: {
           slug: "entry-one",
           kind: "note",
+          section: "writing",
+          tags: [],
           status: "draft",
           title: "Entry one",
           summary: null,
@@ -127,6 +200,45 @@ describe("admin entry handler status mapping", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  it("lists, previews, and restores revisions with validation and conflict mapping", async () => {
+    const { deps, handlers } = await setupHandlers();
+
+    expect((await handlers.revisions(request("GET"), entryId)).status).toBe(200);
+    expect((await handlers.revision(request("GET"), entryId, "1")).status).toBe(
+      200
+    );
+    expect(
+      (await handlers.revision(request("GET"), entryId, "not-a-number")).status
+    ).toBe(422);
+    expect(deps.repository.getRevision).toHaveBeenCalledTimes(1);
+
+    deps.repository.restoreRevision.mockRejectedValueOnce(
+      new EntryConflictError("Entry version is stale")
+    );
+    expect(
+      (
+        await handlers.restoreRevision(
+          request("POST", { expectedVersion: 1 }),
+          entryId,
+          "1"
+        )
+      ).status
+    ).toBe(409);
+
+    deps.repository.restoreRevision.mockRejectedValueOnce(
+      new EntryStateError("Revision contains unsafe Markdown")
+    );
+    expect(
+      (
+        await handlers.restoreRevision(
+          request("POST", { expectedVersion: 1 }),
+          entryId,
+          "1"
+        )
+      ).status
+    ).toBe(422);
   });
 
   it("returns 422 for an invalid state transition", async () => {
@@ -167,6 +279,8 @@ describe("admin entry handler status mapping", () => {
     const entry = {
       slug: "entry-one",
       kind: "note",
+      section: "writing",
+      tags: ["TypeScript"],
       status: "draft",
       title: "Entry one",
       summary: null,
@@ -180,6 +294,8 @@ describe("admin entry handler status mapping", () => {
         request("POST", {
           slug: entry.slug,
           kind: entry.kind,
+          section: entry.section,
+          tags: entry.tags,
           title: entry.title,
           summary: entry.summary,
           bodyMarkdown: entry.bodyMarkdown,

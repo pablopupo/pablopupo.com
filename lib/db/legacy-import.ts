@@ -11,11 +11,14 @@ import {
   projects,
   projectTechnologies,
 } from "./schema";
+import { entryTagsSchema } from "./validation";
 import type * as schema from "./schema";
 
 type LegacyEntry = {
   slug: string;
   kind: "essay";
+  section: "writing" | "music";
+  tags: string[];
   status: "draft" | "published";
   title: string;
   summary: string | null;
@@ -200,6 +203,9 @@ const legacyProjects: LegacyProject[] = [
 
 export function parseLegacyPost(raw: string, slug: string): LegacyEntry {
   const parsed = matter(raw);
+  const tags = entryTagsSchema.parse(
+    Array.isArray(parsed.data.tags) ? parsed.data.tags : []
+  );
   const publishedAt = new Date(`${String(parsed.data.date)}T00:00:00.000Z`);
   if (Number.isNaN(publishedAt.getTime())) {
     throw new Error(`Legacy post ${slug} has an invalid date`);
@@ -211,6 +217,10 @@ export function parseLegacyPost(raw: string, slug: string): LegacyEntry {
   return {
     slug,
     kind: "essay",
+    section: tags.some((tag) => tag.toLowerCase() === "music")
+      ? "music"
+      : "writing",
+    tags,
     status: parsed.data.draft === true ? "draft" : "published",
     title: parsed.data.title,
     summary:
@@ -311,6 +321,8 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
         target: entries.slug,
         set: {
           kind: entry.kind,
+          section: entry.section,
+          tags: entry.tags,
           status: entry.status,
           title: entry.title,
           summary: entry.summary,

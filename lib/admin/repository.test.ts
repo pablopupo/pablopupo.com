@@ -1,17 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "../db/schema";
-import { createMigratedDatabase } from "../db/test-database";
+import {
+  createMigratedDatabase,
+  PGLITE_TEST_TIMEOUT_MS,
+} from "../db/test-database";
 
-const clients: PGlite[] = [];
 const now = new Date("2026-07-22T12:00:00Z");
 
-async function setup() {
+async function createTestContext() {
   const client = await createMigratedDatabase();
   expect(client, "generated SQL migrations").toBeDefined();
   if (!client) throw new Error("Generated SQL migrations are required");
-  clients.push(client);
   const module = await import("./repository").catch(() => undefined);
   expect(module).toBeDefined();
   expect(module?.createAdminEntryRepository).toBeTypeOf("function");
@@ -21,11 +21,390 @@ async function setup() {
   };
 }
 
+let testContext: Awaited<ReturnType<typeof createTestContext>> | undefined;
+
+function setup() {
+  if (!testContext) throw new Error("Repository test database is unavailable");
+  return testContext;
+}
+
+beforeAll(async () => {
+  testContext = await createTestContext();
+}, PGLITE_TEST_TIMEOUT_MS);
+
 afterEach(async () => {
-  await Promise.all(clients.splice(0).map((client) => client.close()));
-});
+  await testContext?.client.exec("TRUNCATE TABLE entries CASCADE");
+}, PGLITE_TEST_TIMEOUT_MS);
+
+afterAll(async () => {
+  await testContext?.client.close();
+}, PGLITE_TEST_TIMEOUT_MS);
 
 describe("admin entry repository", () => {
+  it("preserves section and ordered tags through revisions, transitions, and duplication", async () => {
+    const { client, repository } = await setup();
+    const created = await repository.createDraft(
+      {
+        slug: "music-essay",
+        title: "Music essay",
+        kind: "essay",
+        section: "music",
+        tags: ["Chopin", "Analysis"],
+        bodyMarkdown: "Draft body",
+      },
+      now
+    );
+
+    expect(created).toMatchObject({
+      section: "music",
+      tags: ["Chopin", "Analysis"],
+      version: 1,
+    });
+    const updated = await repository.updateEntry(
+      created.id,
+      1,
+      {
+        slug: "music-essay",
+        kind: "essay",
+        section: "music",
+        tags: ["Chopin", "Counterpoint"],
+        status: "draft",
+        title: "Music essay",
+        summary: null,
+        bodyMarkdown: "Revised body",
+        publishedAt: null,
+        performance: null,
+      },
+      new Date("2026-07-22T13:00:00Z")
+    );
+    const published = await repository.transitionEntry(
+      created.id,
+      2,
+      { action: "publish" },
+      new Date("2026-07-22T14:00:00Z")
+    );
+    const duplicated = await repository.duplicateEntry(created.id, now);
+
+    expect(updated).toMatchObject({ section: "music", tags: ["Chopin", "Counterpoint"] });
+    expect(published).toMatchObject({ section: "music", tags: ["Chopin", "Counterpoint"] });
+    expect(duplicated).toMatchObject({
+      slug: "music-essay-copy",
+      section: "music",
+      tags: ["Chopin", "Counterpoint"],
+      status: "draft",
+    });
+    const revisions = await client.query<{
+      revision_number: number;
+      section: string;
+      tags: string[];
+    }>(
+      `SELECT revision_number, section, tags
+       FROM entry_revisions
+       WHERE entry_id = $1
+       ORDER BY revision_number`,
+      [created.id]
+    );
+    expect(revisions.rows).toEqual([
+      { revision_number: 1, section: "music", tags: ["Chopin", "Analysis"] },
+      { revision_number: 2, section: "music", tags: ["Chopin", "Counterpoint"] },
+      { revision_number: 3, section: "music", tags: ["Chopin", "Counterpoint"] },
+    ]);
+  });
+
+  it("lists newest revisions and restores an immutable snapshot without changing publication", async () => {
+    const { client, repository } = await setup();
+    const created = await repository.createDraft(
+      {
+        slug: "revision-history",
+        title: "Original title",
+        kind: "essay",
+        section: "writing",
+        tags: ["Original"],
+        bodyMarkdown: "Original body",
+      },
+      now
+    );
+    await repository.updateEntry(
+      created.id,
+      1,
+      {
+        slug: "revision-history-revised",
+        kind: "essay",
+        section: "music",
+        tags: ["Revised"],
+        status: "draft",
+        title: "Revised title",
+        summary: "Revised summary",
+        bodyMarkdown: "Revised body",
+        publishedAt: null,
+        performance: null,
+      },
+      new Date("2026-07-22T13:00:00Z")
+    );
+    const publishedAt = new Date("2026-07-22T14:00:00Z");
+    await repository.transitionEntry(
+      created.id,
+      2,
+      { action: "publish" },
+      publishedAt
+    );
+
+    await expect(repository.listRevisions(created.id)).resolves.toMatchObject([
+      { revisionNumber: 3, status: "published", title: "Revised title" },
+      { revisionNumber: 2, status: "draft", title: "Revised title" },
+      { revisionNumber: 1, status: "draft", title: "Original title" },
+    ]);
+    await expect(repository.getRevision(created.id, 1)).resolves.toMatchObject({
+      revisionNumber: 1,
+      slug: "revision-history",
+      section: "writing",
+      tags: ["Original"],
+      bodyMarkdown: "Original body",
+    });
+
+    const restored = await repository.restoreRevision(
+      created.id,
+      1,
+      3,
+      new Date("2026-07-22T15:00:00Z")
+    );
+
+    expect(restored).toMatchObject({
+      slug: "revision-history",
+      section: "writing",
+      tags: ["Original"],
+      status: "published",
+      title: "Original title",
+      summary: null,
+      bodyMarkdown: "Original body",
+      publishedAt,
+      version: 4,
+    });
+    const history = await client.query<{
+      revision_number: number;
+      status: string;
+      title: string;
+      body_markdown: string;
+    }>(
+      `SELECT revision_number, status, title, body_markdown
+       FROM entry_revisions
+       WHERE entry_id = $1
+       ORDER BY revision_number`,
+      [created.id]
+    );
+    expect(history.rows).toEqual([
+      { revision_number: 1, status: "draft", title: "Original title", body_markdown: "Original body" },
+      { revision_number: 2, status: "draft", title: "Revised title", body_markdown: "Revised body" },
+      { revision_number: 3, status: "published", title: "Revised title", body_markdown: "Revised body" },
+      { revision_number: 4, status: "published", title: "Original title", body_markdown: "Original body" },
+    ]);
+    await expect(
+      repository.restoreRevision(created.id, 2, 3, new Date("2026-07-22T16:00:00Z"))
+    ).rejects.toMatchObject({ name: "EntryConflictError" });
+    const historyAfterConflict = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM entry_revisions WHERE entry_id = $1`,
+      [created.id]
+    );
+    expect(historyAfterConflict.rows[0]?.count).toBe(4);
+  });
+
+  it("restores performance details from a revision snapshot", async () => {
+    const { client, repository } = await setup();
+    const created = await repository.createDraft(
+      {
+        slug: "performance-history",
+        title: "Performance history",
+        kind: "performance",
+        section: "music",
+        tags: ["Chopin"],
+        performance: {
+          workTitle: "Etude Op. 10 No. 1",
+          composer: "Frédéric Chopin",
+          venue: "Home",
+          performedAt: new Date("2026-07-20T15:00:00Z"),
+          youtubeUrl: "https://youtu.be/M7lc1UVf-VE",
+          notesMarkdown: "Original take",
+        },
+      },
+      now
+    );
+    await repository.updateEntry(
+      created.id,
+      1,
+      {
+        slug: "performance-history-note",
+        kind: "note",
+        section: "writing",
+        tags: [],
+        status: "draft",
+        title: "Now a note",
+        summary: null,
+        bodyMarkdown: "No performance",
+        publishedAt: null,
+        performance: null,
+      },
+      new Date("2026-07-22T13:00:00Z")
+    );
+
+    const restored = await repository.restoreRevision(
+      created.id,
+      1,
+      2,
+      new Date("2026-07-22T14:00:00Z")
+    );
+
+    expect(restored).toMatchObject({
+      kind: "performance",
+      section: "music",
+      tags: ["Chopin"],
+      version: 3,
+      performance: {
+        workTitle: "Etude Op. 10 No. 1",
+        composer: "Frédéric Chopin",
+        venue: "Home",
+        performedAt: new Date("2026-07-20T15:00:00Z"),
+        youtubeUrl: "https://youtu.be/M7lc1UVf-VE",
+        notesMarkdown: "Original take",
+      },
+    });
+    const revisions = await client.query<{
+      revision_number: number;
+      performance_details: { composer: string } | null;
+    }>(
+      `SELECT revision_number, performance_details
+       FROM entry_revisions
+       WHERE entry_id = $1
+       ORDER BY revision_number`,
+      [created.id]
+    );
+    expect(revisions.rows).toMatchObject([
+      { revision_number: 1, performance_details: { composer: "Frédéric Chopin" } },
+      { revision_number: 2, performance_details: null },
+      { revision_number: 3, performance_details: { composer: "Frédéric Chopin" } },
+    ]);
+  });
+
+  it("rejects an unsafe legacy revision without changing the current entry", async () => {
+    const { client, repository } = await setup();
+    const created = await repository.createDraft(
+      {
+        slug: "legacy-embed",
+        title: "Legacy embed",
+        bodyMarkdown:
+          '<iframe src="https://www.youtube.com/embed/M7lc1UVf-VE"></iframe>',
+      },
+      now
+    );
+    await repository.updateEntry(
+      created.id,
+      1,
+      {
+        slug: "legacy-embed",
+        kind: "note",
+        section: "writing",
+        tags: [],
+        status: "draft",
+        title: "Safe entry",
+        summary: null,
+        bodyMarkdown: "Safe body",
+        publishedAt: null,
+        performance: null,
+      },
+      new Date("2026-07-22T13:00:00Z")
+    );
+
+    await expect(
+      repository.restoreRevision(
+        created.id,
+        1,
+        2,
+        new Date("2026-07-22T14:00:00Z")
+      )
+    ).rejects.toMatchObject({ name: "EntryStateError" });
+    await expect(repository.getEntry(created.id)).resolves.toMatchObject({
+      title: "Safe entry",
+      bodyMarkdown: "Safe body",
+      version: 2,
+    });
+    const revisions = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM entry_revisions WHERE entry_id = $1`,
+      [created.id]
+    );
+    expect(revisions.rows[0]?.count).toBe(2);
+  });
+
+  it.each([
+    ["publish", { action: "publish" }],
+    [
+      "schedule",
+      {
+        action: "schedule",
+        scheduledAt: new Date("2026-08-01T12:00:00Z"),
+      },
+    ],
+  ] as const)(
+    "rejects unsafe legacy Markdown before %s without changing the entry",
+    async (_, transition) => {
+      const { client, repository } = await setup();
+      const created = await repository.createDraft(
+        {
+          slug: `unsafe-${transition.action}`,
+          title: `Unsafe ${transition.action}`,
+          bodyMarkdown:
+            '<iframe src="https://www.youtube.com/embed/M7lc1UVf-VE"></iframe>',
+        },
+        now
+      );
+
+      await expect(
+        repository.transitionEntry(
+          created.id,
+          1,
+          transition,
+          new Date("2026-07-22T13:00:00Z")
+        )
+      ).rejects.toMatchObject({ name: "EntryStateError" });
+      await expect(repository.getEntry(created.id)).resolves.toMatchObject({
+        status: "draft",
+        publishedAt: null,
+        version: 1,
+      });
+      const revisions = await client.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM entry_revisions WHERE entry_id = $1`,
+        [created.id]
+      );
+      expect(revisions.rows[0]?.count).toBe(1);
+    }
+  );
+
+  it("rejects duplicating unsafe legacy Markdown without creating a copy", async () => {
+    const { client, repository } = await setup();
+    const created = await repository.createDraft(
+      {
+        slug: "unsafe-duplicate",
+        title: "Unsafe duplicate",
+        bodyMarkdown:
+          '<iframe src="https://www.youtube.com/embed/M7lc1UVf-VE"></iframe>',
+      },
+      now
+    );
+
+    await expect(repository.duplicateEntry(created.id, now)).rejects.toMatchObject({
+      name: "EntryStateError",
+    });
+    await expect(repository.getEntry(created.id)).resolves.toMatchObject({
+      slug: "unsafe-duplicate",
+      status: "draft",
+      version: 1,
+    });
+    const rows = await client.query<{ entries: number; revisions: number }>(
+      `SELECT
+         (SELECT COUNT(*)::int FROM entries) AS entries,
+         (SELECT COUNT(*)::int FROM entry_revisions) AS revisions`
+    );
+    expect(rows.rows[0]).toEqual({ entries: 1, revisions: 1 });
+  });
+
   it("creates private drafts with initial revisions and lists deterministic ties", async () => {
     const { client, repository } = await setup();
 
@@ -41,6 +420,8 @@ describe("admin entry repository", () => {
     expect(first).toMatchObject({
       slug: "alpha-draft",
       kind: "note",
+      section: "writing",
+      tags: [],
       status: "draft",
       title: "Alpha draft",
       bodyMarkdown: "",
@@ -59,6 +440,8 @@ describe("admin entry repository", () => {
         "id",
         "slug",
         "kind",
+        "section",
+        "tags",
         "status",
         "title",
         "publishedAt",
@@ -143,6 +526,8 @@ describe("admin entry repository", () => {
       {
         slug: "chopin-etude-revised",
         kind: "performance",
+        section: "music",
+        tags: [],
         status: "draft",
         title: "Chopin Etude, revised",
         summary: "A cleaner take",
@@ -223,6 +608,8 @@ describe("admin entry repository", () => {
         {
           slug: "rollback-performance",
           kind: "performance",
+          section: "music",
+          tags: [],
           status: "draft",
           title: "This must roll back",
           summary: null,
@@ -260,6 +647,8 @@ describe("admin entry repository", () => {
     const mutation = {
       slug: "stale-draft",
       kind: "note" as const,
+      section: "writing" as const,
+      tags: [] as string[],
       status: "draft" as const,
       title: "First save wins",
       summary: null,
@@ -274,6 +663,13 @@ describe("admin entry repository", () => {
       mutation,
       new Date("2026-07-22T13:00:00Z")
     );
+    const noOp = await repository.updateEntry(
+      created.id,
+      2,
+      mutation,
+      new Date("2026-07-22T13:30:00Z")
+    );
+    expect(noOp).toMatchObject({ version: 2, title: "First save wins" });
     await expect(
       repository.updateEntry(
         created.id,

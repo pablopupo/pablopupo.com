@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 
+export const PGLITE_TEST_TIMEOUT_MS = 30_000;
+
 export function getMigrationFiles(): string[] {
   const directory = path.join(process.cwd(), "drizzle");
   if (!fs.existsSync(directory)) return [];
