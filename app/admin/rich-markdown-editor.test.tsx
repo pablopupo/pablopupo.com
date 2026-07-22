@@ -28,6 +28,10 @@ vi.mock("@milkdown/kit/plugin/upload", () => ({
   uploadConfig: { key: {} },
 }));
 
+vi.mock("@milkdown/kit/core", () => ({
+  editorViewOptionsCtx: {},
+}));
+
 vi.mock("@milkdown/kit/prose/state", () => ({
   Plugin: class Plugin {},
 }));
@@ -49,7 +53,10 @@ vi.mock("@milkdown/react", () => ({
   useEditor: () => ({ get: () => null, loading: true }),
 }));
 
-import "./rich-markdown-editor";
+import {
+  accessibleEditorViewOptions,
+  richEditorFeatures,
+} from "./rich-markdown-editor";
 
 describe("rich Markdown YouTube node", () => {
   const match = () => {
@@ -75,5 +82,20 @@ describe("rich Markdown YouTube node", () => {
         children: [{ type: "text", value: "caption" }],
       })
     ).toBe(false);
+  });
+});
+
+describe("rich Markdown accessibility", () => {
+  it("names the multiline editor and removes the pointer-only toolbar", () => {
+    expect(richEditorFeatures()["top-bar"]).toBe(false);
+    expect(
+      accessibleEditorViewOptions({ attributes: { spellcheck: "true" } })
+    ).toEqual({
+      attributes: {
+        spellcheck: "true",
+        "aria-label": "Markdown content",
+        "aria-multiline": "true",
+      },
+    });
   });
 });

@@ -6,6 +6,7 @@ import { OpenSourceList, ProjectList } from "@/components/public-work";
 import { getLiveContributions } from "@/lib/github-status";
 import { createPublicAlternates } from "@/lib/metadata";
 import { getPublicEntries, getPublicProjects } from "@/lib/public-content";
+import { buildPublicGraph } from "@/lib/public-graph";
 import { getPublicProfile } from "@/lib/public-profile";
 
 export const revalidate = 60;
@@ -25,6 +26,15 @@ function graduationLabel(value: string | null) {
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
+export function selectSelectedProjects<T extends { featured: boolean }>(
+  projects: T[]
+) {
+  return [
+    ...projects.filter((project) => project.featured),
+    ...projects.filter((project) => !project.featured),
+  ].slice(0, 3);
+}
+
 export default async function Home() {
   const [profile, projects, entries, contributions] = await Promise.all([
     getPublicProfile(),
@@ -38,6 +48,7 @@ export default async function Home() {
   const music = entries
     .filter((entry) => entry.section === "music")
     .slice(0, 3);
+  const graph = buildPublicGraph(projects, entries);
   const graduation = graduationLabel(profile.graduationOn);
 
   return (
@@ -91,7 +102,7 @@ export default async function Home() {
             Projects, technical notes, music, and the ideas connecting them.
           </p>
         </div>
-        <KnowledgeGraph />
+        <KnowledgeGraph data={graph} />
       </section>
 
       <section className="home-section" aria-labelledby="selected-work-title">
@@ -99,7 +110,7 @@ export default async function Home() {
           <h2 id="selected-work-title">Selected work</h2>
           <a href="/work">All work</a>
         </div>
-        <ProjectList projects={projects.slice(0, 3)} compact />
+        <ProjectList projects={selectSelectedProjects(projects)} compact />
       </section>
 
       <section className="home-section" aria-labelledby="recent-writing-title">

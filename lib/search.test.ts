@@ -47,13 +47,18 @@ function project(
   return {
     id: null,
     slug: overrides.slug ?? "parser",
+    kind: "project" as const,
     title: overrides.title ?? "C++ [AI] parser",
+    organization: null,
     summary:
       overrides.summary === undefined
         ? "A literal-pattern parser."
         : overrides.summary,
     bodyMarkdown: overrides.bodyMarkdown ?? "Parses notation safely.",
+    startedOn: null,
+    endedOn: null,
     publishedAt,
+    featured: false,
     technologies: overrides.technologies ?? ["C++"],
     links: [],
   };

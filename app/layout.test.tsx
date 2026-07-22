@@ -15,6 +15,14 @@ vi.mock("./nav", () => ({
   default: () => <nav>Navigation</nav>,
 }));
 
+vi.mock("@/components/vercel-analytics", () => ({
+  default: () => <span data-vercel-analytics="enabled" />,
+}));
+
+vi.mock("@/components/page-view-tracker", () => ({
+  default: () => <span data-first-party-analytics="enabled" />,
+}));
+
 vi.mock("@/lib/public-profile", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/public-profile")>()),
   getPublicProfile: mocks.getPublicProfile,
@@ -47,6 +55,10 @@ describe("root layout discovery metadata", () => {
     expect(html).toContain('"@type":"Person"');
     expect(html).toContain("Miami, Florida");
     expect(html).toContain("December 2026");
+    expect(html).toContain('data-vercel-analytics="enabled"');
+    expect(html).toContain('data-first-party-analytics="enabled"');
+    expect(html).toContain('<a class="skip-link" href="#main-content">');
+    expect(html).toContain('<main id="main-content">');
     expect(html).not.toContain("Handtevy");
   });
 

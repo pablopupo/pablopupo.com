@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   entryMutationSchema,
   entryTagsSchema,
+  normalizeDueScheduledPublication,
   type EntryMutation,
 } from "../db/validation";
 import {
@@ -77,7 +78,14 @@ type AdminEntryRepository = {
     bodyMarkdown?: string;
     performance?: EntryMutation["performance"];
   }, now?: Date) => Promise<unknown>;
-  getEntry: (id: string) => Promise<{ slug: string } | undefined>;
+  getEntry: (id: string) => Promise<
+    | {
+        slug: string;
+        status: "draft" | "scheduled" | "published" | "archived";
+        publishedAt: Date | string | null;
+      }
+    | undefined
+  >;
   listRevisions: (id: string) => Promise<unknown>;
   getRevision: (id: string, revisionNumber: number) => Promise<unknown | undefined>;
   restoreRevision: (
@@ -278,14 +286,34 @@ export function createAdminEntryHandlers(dependencies: AdminEntryHandlerDependen
       if (rejection) return rejection;
       const invalidId = entryIdValidationResponse(id);
       if (invalidId) return invalidId;
-      const mutation = updateSchema.safeParse(await parseJson(request));
+      const now = dependencies.now();
+      const input = await parseJson(request);
+      const current = await dependencies.repository.getEntry(id);
+      if (!current) {
+        return Response.json({ error: "entry not found" }, { status: 404 });
+      }
+      const currentWasDue =
+        normalizeDueScheduledPublication(current, now) !== current;
+      const normalizedInput =
+        input && typeof input === "object" && !Array.isArray(input)
+          ? {
+              ...input,
+              entry: currentWasDue
+                ? normalizeDueScheduledPublication(
+                    (input as { entry?: unknown }).entry,
+                    now
+                  )
+                : (input as { entry?: unknown }).entry,
+            }
+          : input;
+      const mutation = updateSchema.safeParse(normalizedInput);
       if (!mutation.success) return validationResponse(mutation.error);
       try {
         const entry = await dependencies.repository.updateEntry(
           id,
           mutation.data.expectedVersion,
           mutation.data.entry,
-          dependencies.now()
+          now
         );
         dependencies.revalidate();
         return Response.json({ entry });

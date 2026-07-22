@@ -1,4 +1,5 @@
 import MarkdownContent from "@/components/markdown-content";
+import Comments from "@/components/comments";
 import {
   formatEditorialDate,
   YoutubeEmbed,
@@ -55,6 +56,7 @@ export function PublicEntryPage({ entry }: { entry: PublicEntry }) {
       )}
 
       <MarkdownContent markdown={entry.bodyMarkdown} />
+      {entry.id ? <Comments entryId={entry.id} /> : null}
     </article>
   );
 }

@@ -4,10 +4,19 @@ import { useState, type ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
 import type { AdminRouteState } from "./admin-route";
 
-type AdminTab = "entries" | "profile" | "media";
+type AdminTab =
+  | "entries"
+  | "work"
+  | "comments"
+  | "analytics"
+  | "profile"
+  | "media";
 
 const tabs = [
   { id: "entries", href: "/admin", label: "Entries" },
+  { id: "work", href: "/admin/work", label: "Work" },
+  { id: "comments", href: "/admin/comments", label: "Comments" },
+  { id: "analytics", href: "/admin/analytics", label: "Analytics" },
   { id: "profile", href: "/admin/profile", label: "Profile" },
   { id: "media", href: "/admin/media", label: "Media" },
 ] as const;
@@ -87,8 +96,8 @@ export function AdminShell({
         .admin-header h1 { margin-bottom: 0.2rem; }
         .admin-shell button { font: 0.8125rem var(--mono); padding: 0.45rem 0.7rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--code-bg); color: var(--ink); cursor: pointer; }
         .admin-shell button:disabled { opacity: 0.45; cursor: default; }
-        .admin-tabs { display: flex; gap: 1.4rem; margin-top: 1.25rem; border-bottom: 1px solid var(--hairline); }
-        .admin-tabs a { padding: 0 0 0.55rem; color: var(--muted); font: 0.75rem var(--mono); text-decoration: none; border-bottom: 1px solid transparent; margin-bottom: -1px; }
+        .admin-tabs { display: flex; gap: 1.4rem; margin-top: 1.25rem; border-bottom: 1px solid var(--hairline); overflow-x: auto; }
+        .admin-tabs a { flex: none; padding: 0 0 0.55rem; color: var(--muted); font: 0.75rem var(--mono); text-decoration: none; border-bottom: 1px solid transparent; margin-bottom: -1px; }
         .admin-tabs a:hover, .admin-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); }
         .admin-meta { color: var(--muted); font: 0.75rem var(--mono); }
         .admin-message { margin-top: 0.75rem; color: var(--accent); font: 0.8125rem var(--mono); }

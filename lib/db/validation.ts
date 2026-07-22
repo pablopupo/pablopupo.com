@@ -44,6 +44,27 @@ const youtubeUrlSchema = safeHttpUrlSchema.refine(
 
 const publicationStatusSchema = z.enum(["draft", "scheduled", "published", "archived"]);
 const publicationDateSchema = z.coerce.date().nullable().optional();
+
+export function normalizeDueScheduledPublication<T>(value: T, now: Date): T {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const publication = value as Record<string, unknown>;
+  if (publication.status !== "scheduled") return value;
+  const publishedAt =
+    publication.publishedAt instanceof Date
+      ? publication.publishedAt
+      : typeof publication.publishedAt === "string" ||
+          typeof publication.publishedAt === "number"
+        ? new Date(publication.publishedAt)
+        : undefined;
+  if (
+    !publishedAt ||
+    Number.isNaN(publishedAt.getTime()) ||
+    publishedAt.getTime() > now.getTime()
+  ) {
+    return value;
+  }
+  return { ...publication, status: "published" } as T;
+}
 export const entryTagsSchema = z
   .array(z.string().trim().min(1).max(50))
   .max(20)

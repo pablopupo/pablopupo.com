@@ -30,7 +30,7 @@ export default async function Work() {
 
       <section aria-labelledby="projects-title">
         <div className="section-heading">
-          <h2 id="projects-title">Projects</h2>
+          <h2 id="projects-title">Projects and experience</h2>
         </div>
         <ProjectList projects={projects} />
       </section>

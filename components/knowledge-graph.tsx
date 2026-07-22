@@ -9,9 +9,12 @@ import {
   forceX,
   forceY,
 } from "d3-force";
-import graph from "../data/graph.generated.json";
+import type {
+  PublicGraphData,
+  PublicGraphNodeType,
+} from "@/lib/public-graph";
 
-type NodeType = "project" | "oss" | "concept" | "writing" | "music";
+type NodeType = PublicGraphNodeType;
 
 type SimNode = {
   id: string;
@@ -78,7 +81,9 @@ function readTheme(): Theme {
   };
 }
 
-export default function KnowledgeGraph() {
+const INITIAL_CAPTION = "hover, focus, or browse nodes below";
+
+export default function KnowledgeGraph({ data }: { data: PublicGraphData }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<{
@@ -95,12 +100,13 @@ export default function KnowledgeGraph() {
     height: number;
     reducedMotion: boolean;
     paint?: () => void;
+    selectNode?: (id: string | null) => void;
   } | null>(null);
-  const [caption, setCaption] = useState("hover to explore · click to open");
+  const [caption, setCaption] = useState(INITIAL_CAPTION);
   const [hidden, setHidden] = useState<Set<NodeType>>(new Set());
 
   const presentTypes = Array.from(
-    new Set((graph.nodes as { type: NodeType }[]).map((n) => n.type))
+    new Set(data.nodes.map((node) => node.type))
   );
 
   useEffect(() => {
@@ -108,9 +114,9 @@ export default function KnowledgeGraph() {
     const wrap = wrapRef.current;
     if (!canvas || !wrap) return;
 
-    const nodes: SimNode[] = (graph.nodes as SimNode[]).map((n) => ({ ...n }));
+    const nodes: SimNode[] = data.nodes.map((node) => ({ ...node, x: 0, y: 0 }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    const edges: SimEdge[] = (graph.edges as SimEdge[])
+    const edges: SimEdge[] = (data.edges as SimEdge[])
       .filter((e) => byId.has(e.s) && byId.has(e.t))
       .map((e) => ({ ...e, source: byId.get(e.s)!, target: byId.get(e.t)! }));
 
@@ -145,6 +151,7 @@ export default function KnowledgeGraph() {
       height: 0,
       reducedMotion,
       paint: undefined as (() => void) | undefined,
+      selectNode: undefined as ((id: string | null) => void) | undefined,
     };
     stateRef.current = state;
 
@@ -315,7 +322,7 @@ export default function KnowledgeGraph() {
 
     function describe(node: SimNode | null) {
       if (!node) {
-        setCaption("hover to explore · click to open");
+        setCaption(INITIAL_CAPTION);
         return;
       }
       const semantic = state.edges.filter(
@@ -329,6 +336,12 @@ export default function KnowledgeGraph() {
           : `${node.label} · ${kind}`
       );
     }
+
+    state.selectNode = (id) => {
+      state.selected = id ? byId.get(id) ?? null : null;
+      describe(state.selected);
+      paint();
+    };
 
     let dragNode: SimNode | null = null;
     let downAt: { x: number; y: number } | null = null;
@@ -444,7 +457,7 @@ export default function KnowledgeGraph() {
       observer.disconnect();
       state.sim?.stop();
     };
-  }, []);
+  }, [data]);
 
   useEffect(() => {
     const state = stateRef.current;
@@ -462,12 +475,18 @@ export default function KnowledgeGraph() {
     });
   }
 
+  const visibleNodes = data.nodes.filter((node) => !hidden.has(node.type));
+
+  function selectNode(id: string) {
+    stateRef.current?.selectNode?.(id);
+  }
+
   return (
     <div ref={wrapRef} className="graph-wrap">
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label="A map of the projects, open source contributions, concepts, and writing on this site, connected by shared ideas."
+        aria-label="A map of the projects, open source contributions, concepts, writing, and music on this site, connected by shared ideas."
       />
       <div className="graph-foot">
         <div className="graph-legend">
@@ -487,6 +506,29 @@ export default function KnowledgeGraph() {
           {caption}
         </p>
       </div>
+      <details className="graph-browser">
+        <summary>Browse graph nodes</summary>
+        <ul>
+          {visibleNodes.map((node) => (
+            <li key={node.id}>
+              {node.href ? (
+                <a href={node.href} onFocus={() => selectNode(node.id)}>
+                  {node.label}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onFocus={() => selectNode(node.id)}
+                  onClick={() => selectNode(node.id)}
+                >
+                  {node.label}
+                </button>
+              )}
+              <span>{TYPE_LABELS[node.type]}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

@@ -472,6 +472,41 @@ export const comments = pgTable(
   ]
 );
 
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    scope: text("scope").notNull(),
+    clientKey: text("client_key").notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    requestCount: integer("request_count").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("rate_limit_buckets_scope_client_unique").on(
+      table.scope,
+      table.clientKey
+    ),
+    index("rate_limit_buckets_expires_idx").on(table.expiresAt),
+    check(
+      "rate_limit_buckets_scope_check",
+      sql`${table.scope} IN ('comments', 'analytics')`
+    ),
+    check(
+      "rate_limit_buckets_client_key_check",
+      sql`char_length(${table.clientKey}) = 64 AND ${table.clientKey} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "rate_limit_buckets_request_count_check",
+      sql`${table.requestCount} > 0`
+    ),
+    check(
+      "rate_limit_buckets_expiration_check",
+      sql`${table.expiresAt} > ${table.windowStartedAt} AND ${table.expiresAt} <= ${table.windowStartedAt} + INTERVAL '10 minutes'`
+    ),
+  ]
+);
+
 export const analyticsEvents = pgTable(
   "analytics_events",
   {

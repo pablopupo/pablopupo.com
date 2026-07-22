@@ -202,6 +202,85 @@ describe("admin entry handler status mapping", () => {
     expect(response.status).toBe(409);
   });
 
+  it("normalizes a due scheduled entry to published when it is edited", async () => {
+    const repository = {
+      ...dependencies().repository,
+      getEntry: vi.fn().mockResolvedValue({
+        id: entryId,
+        slug: "entry-one",
+        status: "scheduled",
+        publishedAt: new Date("2026-07-22T11:00:00Z"),
+      }),
+    };
+    const { deps, handlers } = await setupHandlers({ repository });
+
+    const response = await handlers.update(
+      request("PATCH", {
+        expectedVersion: 1,
+        entry: {
+          slug: "entry-one",
+          kind: "note",
+          section: "writing",
+          tags: [],
+          status: "scheduled",
+          title: "Entry one, revised",
+          summary: null,
+          bodyMarkdown: "Body",
+          publishedAt: "2026-07-22T11:00:00Z",
+          performance: null,
+        },
+      }),
+      entryId
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.repository.updateEntry).toHaveBeenCalledWith(
+      entryId,
+      1,
+      expect.objectContaining({
+        status: "published",
+        title: "Entry one, revised",
+        publishedAt: new Date("2026-07-22T11:00:00Z"),
+      }),
+      new Date("2026-07-22T12:00:00Z")
+    );
+  });
+
+  it("does not turn an archived entry with an old date into a publication", async () => {
+    const repository = {
+      ...dependencies().repository,
+      getEntry: vi.fn().mockResolvedValue({
+        id: entryId,
+        slug: "entry-one",
+        status: "archived",
+        publishedAt: new Date("2026-07-01T12:00:00Z"),
+      }),
+    };
+    const { handlers } = await setupHandlers({ repository });
+
+    const response = await handlers.update(
+      request("PATCH", {
+        expectedVersion: 1,
+        entry: {
+          slug: "entry-one",
+          kind: "note",
+          section: "writing",
+          tags: [],
+          status: "scheduled",
+          title: "Entry one",
+          summary: null,
+          bodyMarkdown: "Body",
+          publishedAt: "2026-07-01T12:00:00Z",
+          performance: null,
+        },
+      }),
+      entryId
+    );
+
+    expect(response.status).toBe(422);
+    expect(repository.updateEntry).not.toHaveBeenCalled();
+  });
+
   it("lists, previews, and restores revisions with validation and conflict mapping", async () => {
     const { deps, handlers } = await setupHandlers();
 

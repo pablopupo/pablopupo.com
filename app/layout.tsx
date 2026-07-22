@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { cache } from "react";
+import PageViewTracker from "@/components/page-view-tracker";
+import VercelAnalytics from "@/components/vercel-analytics";
 import Nav from "./nav";
 import { createRootMetadata } from "@/lib/metadata";
 import { getPublicProfile } from "@/lib/public-profile";
@@ -39,10 +41,13 @@ export default async function RootLayout({
             __html: serializeJsonLd(identity.structuredData),
           }}
         />
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
         <header>
           <Nav />
         </header>
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
         <footer>
           {profile.githubUrl ? <a href={profile.githubUrl}>GitHub</a> : null}
           {profile.linkedinUrl ? (
@@ -55,6 +60,8 @@ export default async function RootLayout({
           ) : null}
           <a href="/rss.xml">RSS</a>
         </footer>
+        <PageViewTracker />
+        <VercelAnalytics />
       </body>
     </html>
   );

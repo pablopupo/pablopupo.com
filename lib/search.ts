@@ -164,6 +164,10 @@ function entryCandidate(query: string, entry: PublicEntry) {
 
 function projectCandidate(query: string, project: PublicProject) {
   const metadata = [
+    project.kind,
+    project.organization ?? "",
+    project.startedOn ?? "",
+    project.endedOn ?? "",
     ...project.technologies,
     ...project.links.flatMap((link) => [link.kind, link.label]),
   ].join(" ");

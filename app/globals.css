@@ -84,6 +84,22 @@ a:hover {
   background: #cfdbec;
 }
 
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.55rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 body > header nav {
   min-height: 5.25rem;
   display: flex;
@@ -371,6 +387,7 @@ h3 {
 }
 
 .project-technologies,
+.project-meta,
 .project-links,
 .entry-meta,
 .entry-byline,
@@ -386,6 +403,10 @@ h3 {
   flex: none;
   max-width: 48%;
   text-align: right;
+}
+
+.project-meta {
+  margin-top: 0.45rem;
 }
 
 .project-summary {
@@ -858,6 +879,52 @@ pre code {
   font-family: var(--mono);
   font-size: 0.7rem;
   text-align: right;
+}
+
+.graph-browser {
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.graph-browser summary {
+  color: var(--ink);
+  cursor: pointer;
+  width: fit-content;
+}
+
+.graph-browser ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.45rem 1rem;
+  list-style: none;
+  margin-top: 0.8rem;
+}
+
+.graph-browser li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.graph-browser a,
+.graph-browser button {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.15rem 0;
+  text-align: left;
+}
+
+.graph-browser li > span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  white-space: nowrap;
 }
 
 @media (max-width: 760px) {

@@ -35,10 +35,15 @@ export type PublicProjectLink = {
 export type PublicProject = {
   id: string | null;
   slug: string;
+  kind: "project" | "experience";
   title: string;
+  organization: string | null;
   summary: string | null;
   bodyMarkdown: string;
+  startedOn: string | null;
+  endedOn: string | null;
   publishedAt: string;
+  featured: boolean;
   technologies: string[];
   links: PublicProjectLink[];
 };
@@ -68,10 +73,15 @@ type DatabasePerformance = {
 type DatabaseProject = {
   id: string;
   slug: string;
+  kind: PublicProject["kind"];
   title: string;
+  organization: string | null;
   summary: string | null;
   bodyMarkdown: string;
+  startedOn: string | null;
+  endedOn: string | null;
   publishedAt: Date | string | null;
+  featured: boolean;
 };
 
 type DatabaseProjectTechnology = {
@@ -187,13 +197,18 @@ function legacyProject(project: LegacyProject): PublicProject {
   return {
     id: null,
     slug: project.slug,
+    kind: "project",
     title: project.title,
+    organization: null,
     summary: null,
     bodyMarkdown: project.bodyMarkdown,
+    startedOn: null,
+    endedOn: null,
     publishedAt: requiredIsoDate(
       project.publishedAt,
       `Legacy project ${project.slug}`
     ),
+    featured: false,
     technologies: project.technologies,
     links: project.links.map(({ kind, label, url }) => ({ kind, label, url })),
   };
@@ -275,13 +290,18 @@ export function createPublicContentReader(
       return projects.map((project) => ({
         id: project.id,
         slug: project.slug,
+        kind: project.kind,
         title: project.title,
+        organization: project.organization,
         summary: project.summary,
         bodyMarkdown: project.bodyMarkdown,
+        startedOn: project.startedOn,
+        endedOn: project.endedOn,
         publishedAt: requiredIsoDate(
           project.publishedAt,
           `Project ${project.slug}`
         ),
+        featured: project.featured,
         technologies: (technologies.get(project.id) ?? []).map(
           (technology) => technology.name
         ),

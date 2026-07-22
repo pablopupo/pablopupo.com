@@ -39,7 +39,7 @@ afterAll(async () => {
 describe.sequential("content schema migrations", () => {
   it("backfills sections and tags when upgrading a Task 2 database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(4);
+    expect(migrationFiles).toHaveLength(5);
     const client = await prepareDatabase(2);
 
     const inserted = await client.query<{ id: string; kind: string }>(
@@ -81,7 +81,7 @@ describe.sequential("content schema migrations", () => {
 
   it("backfills revision slugs when upgrading an existing database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(4);
+    expect(migrationFiles).toHaveLength(5);
     const client = await prepareDatabase(1);
 
     const inserted = await client.query<{ id: string }>(
@@ -116,7 +116,7 @@ describe.sequential("content schema migrations", () => {
 
   it("preserves existing profile settings when applying the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(4);
+    expect(migrationFiles).toHaveLength(5);
     const client = await prepareDatabase(3);
     const avatar = await client.query<{ id: string }>(
       `INSERT INTO media (storage_key, url, mime_type, alt_text)
@@ -159,7 +159,7 @@ describe.sequential("content schema migrations", () => {
 
   it("fills absent legacy contact and avatar values from the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(4);
+    expect(migrationFiles).toHaveLength(5);
     const client = await prepareDatabase(3);
     await client.exec(
       `INSERT INTO site_settings
@@ -182,6 +182,21 @@ describe.sequential("content schema migrations", () => {
         avatar_media_id: "4c6dfd5f-90bf-45fd-b922-fdf2e01b45fb",
       },
     ]);
+  });
+
+  it("adds global rate-limit buckets when upgrading the existing schema", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(5);
+    const client = await prepareDatabase(4);
+
+    await client.exec(fs.readFileSync(migrationFiles[4]!, "utf8"));
+
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'rate_limit_buckets'`
+    );
+    expect(tables.rows).toEqual([{ table_name: "rate_limit_buckets" }]);
   });
 
   it("creates every approved content table from generated SQL", async () => {
@@ -211,6 +226,7 @@ describe.sequential("content schema migrations", () => {
       "project_links",
       "project_technologies",
       "projects",
+      "rate_limit_buckets",
       "session",
       "site_settings",
       "user",
@@ -321,6 +337,7 @@ describe.sequential("content schema migrations", () => {
         "projects_publication_order_idx",
         "comments_moderation_created_idx",
         "analytics_events_occurred_idx",
+        "rate_limit_buckets_expires_idx",
       ])
     );
   });
@@ -482,5 +499,60 @@ describe.sequential("content schema migrations", () => {
       timezone: "America/New_York",
       utmSource: "newsletter",
     });
+  });
+
+  it("stores only bounded HMAC rate-limit buckets", async () => {
+    expect(getMigrationFiles(), "generated SQL migrations").not.toHaveLength(0);
+    const client = await migratedDatabase();
+    if (!client) return;
+
+    const columns = await client.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_name = 'rate_limit_buckets'
+       ORDER BY ordinal_position`
+    );
+    expect(columns.rows.map((row) => row.column_name)).toEqual([
+      "id",
+      "scope",
+      "client_key",
+      "window_started_at",
+      "request_count",
+      "expires_at",
+    ]);
+    expect(columns.rows.some((row) => /(^|_)ip(_|$)/i.test(row.column_name))).toBe(
+      false
+    );
+
+    const key = "a".repeat(64);
+    await client.query(
+      `INSERT INTO rate_limit_buckets
+         (scope, client_key, window_started_at, request_count, expires_at)
+       VALUES ('comments', $1, '2026-07-22T12:00:00Z', 1, '2026-07-22T12:10:00Z')`,
+      [key]
+    );
+    await expect(
+      client.query(
+        `INSERT INTO rate_limit_buckets
+           (scope, client_key, window_started_at, request_count, expires_at)
+         VALUES ('comments', $1, '2026-07-22T12:00:00Z', 1, '2026-07-22T12:10:00Z')`,
+        [key]
+      )
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO rate_limit_buckets
+           (scope, client_key, window_started_at, request_count, expires_at)
+         VALUES ('comments', '203.0.113.4', '2026-07-22T12:00:00Z', 1, '2026-07-22T12:10:00Z')`
+      )
+    ).rejects.toThrow();
+    await expect(
+      client.query(
+        `INSERT INTO rate_limit_buckets
+           (scope, client_key, window_started_at, request_count, expires_at)
+         VALUES ('unknown', $1, '2026-07-22T12:00:00Z', 0, '2026-07-22T11:00:00Z')`,
+        ["b".repeat(64)]
+      )
+    ).rejects.toThrow();
   });
 }, PGLITE_TEST_TIMEOUT_MS);

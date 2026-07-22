@@ -28,7 +28,18 @@ vi.mock("@/lib/github-status", () => ({
 }));
 
 vi.mock("@/components/knowledge-graph", () => ({
-  default: () => <div data-testid="knowledge-graph">Knowledge graph canvas</div>,
+  default: ({
+    data,
+  }: {
+    data: { nodes: Array<{ id: string }> };
+  }) => (
+    <div data-testid="knowledge-graph">
+      Knowledge graph canvas
+      {data.nodes.map((node) => (
+        <span key={node.id}>{node.id}</span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/markdown-content", () => ({
@@ -102,10 +113,15 @@ const musicEntry = {
 const project = {
   id: "project-id",
   slug: "database-project",
+  kind: "experience" as const,
   title: "Database project",
+  organization: "Example AI Lab",
   summary: "A public applied-AI system.",
   bodyMarkdown: "A retrieval system grounded in musical notation.",
+  startedOn: "2025-06-01",
+  endedOn: null,
   publishedAt: "2026-07-01T12:00:00.000Z",
+  featured: true,
   technologies: ["TypeScript", "Retrieval"],
   links: [
     {
@@ -135,6 +151,20 @@ beforeEach(() => {
 });
 
 describe("public pages", () => {
+  it("prioritizes featured work without dropping the remaining slots", async () => {
+    const { selectSelectedProjects } = await import("./page");
+    const projects = [
+      { slug: "first", featured: false },
+      { slug: "featured", featured: true },
+      { slug: "third", featured: false },
+      { slug: "fourth", featured: false },
+    ];
+
+    expect(
+      selectSelectedProjects(projects).map((candidate) => candidate.slug)
+    ).toEqual(["featured", "first", "third"]);
+  });
+
   it("leads the homepage with the approved profile and places the graph second", async () => {
     const { default: Home } = await import("./page");
 
@@ -154,8 +184,14 @@ describe("public pages", () => {
       html.indexOf("Selected work")
     );
     expect(html).toContain("Database project");
+    expect(html).toContain("Experience");
+    expect(html).toContain("Example AI Lab");
+    expect(html).toContain("June 2025 to Present");
     expect(html).toContain("Database writing");
     expect(html).toContain("Database performance");
+    expect(html).toContain("project:database-project");
+    expect(html).toContain("entry:writing:database-writing");
+    expect(html).toContain("entry:music:database-performance");
     expect(html).toContain("docling #3721");
   });
 

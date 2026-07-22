@@ -9,14 +9,17 @@ import { getAdminAccess } from "./access";
 import { hasSameOrigin, readAdminConfiguration } from "./auth";
 import { createAdminEntryHandlers } from "./handlers";
 import { createAdminMediaHandlers } from "./media-handlers";
+import { createAdminProjectHandlers } from "./project-handlers";
 import {
   createAdminMediaRepository,
   createAdminSettingsRepository,
 } from "./profile-repository";
+import { createAdminProjectRepository } from "./project-repository";
 import { createAdminEntryRepository } from "./repository";
 import { createAdminSettingsHandlers } from "./settings-handlers";
 
 type AdminEntryHandlers = ReturnType<typeof createAdminEntryHandlers>;
+type AdminProjectHandlers = ReturnType<typeof createAdminProjectHandlers>;
 type AdminSettingsHandlers = ReturnType<typeof createAdminSettingsHandlers>;
 type AdminMediaHandlers = ReturnType<typeof createAdminMediaHandlers>;
 
@@ -32,6 +35,13 @@ function revalidateProfile() {
   revalidatePath("/");
   revalidatePath("/about");
   revalidatePath("/admin");
+  revalidatePath("/sitemap.xml");
+}
+
+function revalidateProjectContent() {
+  revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/search");
   revalidatePath("/sitemap.xml");
 }
 
@@ -65,6 +75,31 @@ export async function withAdminEntryHandlers(
       now: () => new Date(),
       revalidate: revalidateAdminContent,
       repository: createAdminEntryRepository(database),
+    });
+    return await operation(handlers);
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function withAdminProjectHandlers(
+  operation: (handlers: AdminProjectHandlers) => Promise<Response>
+) {
+  const configuration = readAdminConfiguration(process.env);
+  if (!configuration) {
+    return Response.json({ error: "admin is not configured" }, { status: 503 });
+  }
+
+  const pool = new Pool({ connectionString: configuration.databaseUrl });
+  try {
+    const database = drizzle(pool, { schema });
+    const handlers = createAdminProjectHandlers({
+      authorize: getAdminAccess,
+      isSameOrigin: (request) =>
+        hasSameOrigin(request, configuration.betterAuthUrl),
+      now: () => new Date(),
+      revalidate: revalidateProjectContent,
+      repository: createAdminProjectRepository(database),
     });
     return await operation(handlers);
   } finally {

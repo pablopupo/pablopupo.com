@@ -19,6 +19,31 @@ function safeProjectUrl(value: string) {
   return null;
 }
 
+function projectDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function projectMetadata(project: PublicProject) {
+  const dates = project.startedOn
+    ? `${projectDate(project.startedOn)} to ${
+        project.endedOn ? projectDate(project.endedOn) : "Present"
+      }`
+    : project.endedOn
+      ? `Through ${projectDate(project.endedOn)}`
+      : null;
+  return [
+    project.kind === "experience" ? "Experience" : "Project",
+    project.organization,
+    dates,
+  ].filter((value): value is string => Boolean(value));
+}
+
 export function ProjectList({
   projects,
   compact = false,
@@ -33,6 +58,7 @@ export function ProjectList({
   return (
     <div className={`project-list${compact ? " project-list-compact" : ""}`}>
       {projects.map((project) => {
+        const metadata = projectMetadata(project);
         const links = project.links.flatMap((link) => {
           const href = safeProjectUrl(link.url);
           return href ? [{ ...link, href }] : [];
@@ -47,6 +73,7 @@ export function ProjectList({
                 </p>
               )}
             </div>
+            <p className="project-meta">{metadata.join(" · ")}</p>
             {project.summary && (
               <p className="project-summary">{project.summary}</p>
             )}

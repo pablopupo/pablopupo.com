@@ -3,8 +3,10 @@
 import { Crepe } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic.css";
+import { editorViewOptionsCtx } from "@milkdown/kit/core";
 import { uploadConfig } from "@milkdown/kit/plugin/upload";
 import { Plugin } from "@milkdown/kit/prose/state";
+import type { EditorProps } from "@milkdown/kit/prose/view";
 import {
   $nodeSchema,
   $prose,
@@ -106,6 +108,37 @@ export type RichMarkdownEditorProps = {
   snapshotRef: MutableRefObject<((submitted?: boolean) => string) | null>;
 };
 
+export function richEditorFeatures() {
+  return {
+    [Crepe.Feature.AI]: false,
+    [Crepe.Feature.ImageBlock]: false,
+    [Crepe.Feature.Latex]: false,
+    [Crepe.Feature.Table]: false,
+    [Crepe.Feature.TopBar]: false,
+  };
+}
+
+export function accessibleEditorViewOptions(options: Partial<EditorProps>) {
+  const accessibleAttributes = {
+    "aria-label": "Markdown content",
+    "aria-multiline": "true",
+  };
+  const attributes = options.attributes;
+  if (typeof attributes === "function") {
+    return {
+      ...options,
+      attributes: (state: Parameters<typeof attributes>[0]) => ({
+        ...attributes(state),
+        ...accessibleAttributes,
+      }),
+    };
+  }
+  return {
+    ...options,
+    attributes: { ...attributes, ...accessibleAttributes },
+  };
+}
+
 function RichEditor({
   defaultValue,
   syncedValue,
@@ -148,19 +181,14 @@ function RichEditor({
       const crepe = new Crepe({
         root,
         defaultValue: initialValue,
-        features: {
-          [Crepe.Feature.AI]: false,
-          [Crepe.Feature.ImageBlock]: false,
-          [Crepe.Feature.Latex]: false,
-          [Crepe.Feature.Table]: false,
-          [Crepe.Feature.TopBar]: true,
-        },
+        features: richEditorFeatures(),
       });
       crepe.editor
         .use(youtubeDirectiveRemark)
         .use(youtubeDirectiveNode)
         .use(dirtyTransactionPlugin)
         .config((ctx) => {
+          ctx.update(editorViewOptionsCtx, accessibleEditorViewOptions);
           ctx.update(uploadConfig.key, (configuration) => ({
             ...configuration,
             uploader: async () => [],
