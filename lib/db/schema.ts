@@ -45,6 +45,11 @@ export const graphNodeKind = pgEnum("graph_node_kind", [
   "oss",
 ]);
 export const graphEdgeKind = pgEnum("graph_edge_kind", ["tag", "link", "semantic"]);
+export const mediaPurpose = pgEnum("media_purpose", [
+  "profile",
+  "resume",
+  "content",
+]);
 export const commentModerationStatus = pgEnum("comment_moderation_status", [
   "pending",
   "approved",
@@ -161,6 +166,10 @@ export const media = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     storageKey: text("storage_key").notNull(),
     url: text("url").notNull(),
+    provider: text("provider").default("static").notNull(),
+    purpose: mediaPurpose("purpose").default("content").notNull(),
+    originalFilename: text("original_filename"),
+    sha256: text("sha256"),
     mimeType: text("mime_type").notNull(),
     altText: text("alt_text"),
     width: integer("width"),
@@ -184,17 +193,28 @@ export const siteSettings = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     singletonKey: text("singleton_key").default("default").notNull(),
     siteTitle: text("site_title").notNull(),
+    headline: text("headline").default("").notNull(),
+    location: text("location"),
+    graduationOn: date("graduation_on"),
     introMarkdown: text("intro_markdown").notNull(),
     aboutMarkdown: text("about_markdown").default("").notNull(),
     contactEmail: text("contact_email"),
+    githubUrl: text("github_url"),
+    linkedinUrl: text("linkedin_url"),
+    youtubeUrl: text("youtube_url"),
     avatarMediaId: uuid("avatar_media_id").references(() => media.id, {
       onDelete: "set null",
     }),
+    resumeMediaId: uuid("resume_media_id").references(() => media.id, {
+      onDelete: "set null",
+    }),
+    version: integer("version").default(1).notNull(),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("site_settings_singleton_unique").on(table.singletonKey),
     check("site_settings_singleton_check", sql`${table.singletonKey} = 'default'`),
+    check("site_settings_version_positive_check", sql`${table.version} > 0`),
   ]
 );
 

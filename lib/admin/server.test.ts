@@ -23,6 +23,9 @@ const environmentKeys = [
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "ADMIN_GITHUB_ID",
+  "BLOB_READ_WRITE_TOKEN",
+  "BLOB_STORE_ID",
+  "VERCEL_OIDC_TOKEN",
 ] as const;
 const originalEnvironment = Object.fromEntries(
   environmentKeys.map((key) => [key, process.env[key]])
@@ -105,6 +108,60 @@ describe("admin entry server runner", () => {
     expect(closedBeforeRejection).toBe(true);
     expect(mocks.pool.end).toHaveBeenCalledTimes(1);
   });
+
+  it("constructs settings handlers with a request-scoped database", async () => {
+    configureEnvironment();
+    const server = await import("./server");
+    const operation = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+
+    const response = await server.withAdminSettingsHandlers(operation);
+
+    expect(response.status).toBe(200);
+    expect(operation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        load: expect.any(Function),
+        update: expect.any(Function),
+      })
+    );
+    expect(mocks.pool.end).toHaveBeenCalledTimes(1);
+  });
+
+  it("constructs media handlers with Blob dependencies and closes the pool", async () => {
+    configureEnvironment();
+    const server = await import("./server");
+    const operation = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+
+    const response = await server.withAdminMediaHandlers(operation);
+
+    expect(response.status).toBe(200);
+    expect(operation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        list: expect.any(Function),
+        upload: expect.any(Function),
+      })
+    );
+    expect(mocks.pool.end).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts either token or complete OIDC Blob credentials", async () => {
+    const server = await import("./server");
+
+    expect(
+      server.readBlobConfiguration({ BLOB_READ_WRITE_TOKEN: " blob-token " })
+    ).toEqual({ configured: true, token: "blob-token" });
+    expect(
+      server.readBlobConfiguration({
+        BLOB_STORE_ID: "store-id",
+        VERCEL_OIDC_TOKEN: "oidc-token",
+      })
+    ).toEqual({ configured: true, token: undefined });
+    expect(
+      server.readBlobConfiguration({
+        BLOB_STORE_ID: "store-id",
+        VERCEL_OIDC_TOKEN: " ",
+      })
+    ).toEqual({ configured: false, token: undefined });
+  });
 });
 
 function configureEnvironment() {
@@ -114,4 +171,5 @@ function configureEnvironment() {
   process.env.BETTER_AUTH_SECRET = "0123456789abcdef0123456789abcdef";
   process.env.BETTER_AUTH_URL = "https://example.com";
   process.env.ADMIN_GITHUB_ID = "12345678";
+  process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { authClient } from "@/lib/auth-client";
 import {
   canStartDocumentDelete,
   canStartDocumentSave,
@@ -24,6 +23,7 @@ import {
   type PersistenceStatus,
   type PersistenceState,
 } from "./editor-persistence";
+import { AdminAccessState, AdminShell } from "./admin-shell";
 import MarkdownEditor, { type MarkdownSnapshot } from "./markdown-editor";
 
 type AdminMode = "unconfigured" | "signed-out" | "forbidden" | "authorized";
@@ -394,28 +394,6 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   useEffect(() => {
     if (mode === "authorized") void loadEntries();
   }, [mode]);
-
-  async function signIn() {
-    await runBusy(async () => {
-      setMessage("");
-      await authClient.signIn.social({ provider: "github", callbackURL: "/admin" });
-    });
-  }
-
-  async function signOut() {
-    if (
-      !shouldDiscardUnsavedChanges(
-        hasPendingEditorChanges(dirty, scheduleDirty)
-      )
-    ) {
-      return;
-    }
-    await runBusy(async () => {
-      setMessage("");
-      await authClient.signOut();
-      window.location.assign("/admin");
-    });
-  }
 
   async function loadEntry(id: string, discardConfirmed = false) {
     if (
@@ -957,52 +935,41 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   }, [dirty, mode, scheduleDirty]);
 
   if (mode === "unconfigured") {
-    const missing = configurationStatus?.missing ?? [];
-    const invalid = configurationStatus?.invalid ?? [];
     return (
-      <section className="admin-state">
-        <h1>Admin</h1>
-        <h2>Admin configuration is incomplete</h2>
-        <p>Set the following server environment variables before using the editor.</p>
-        <ul>{[...missing, ...invalid].map((key) => <li key={key}><code>{key}</code></li>)}</ul>
-      </section>
+      <AdminAccessState
+        state={{
+          mode,
+          configurationStatus: configurationStatus ?? {
+            configured: false,
+            missing: [],
+            invalid: [],
+          },
+        }}
+      />
     );
   }
 
   if (mode === "signed-out") {
-    return (
-      <section className="admin-state">
-        <h1>Admin</h1>
-        <p>Only the configured GitHub owner can manage entries.</p>
-        <button type="button" onClick={signIn} disabled={busy}>Sign in with GitHub</button>
-        {message && <p className="admin-message">{message}</p>}
-      </section>
-    );
+    return <AdminAccessState state={{ mode }} />;
   }
 
   if (mode === "forbidden") {
-    return (
-      <section className="admin-state">
-        <h1>Admin</h1>
-        <p>This GitHub account does not match the configured owner.</p>
-        <button type="button" onClick={signOut} disabled={busy}>Sign out</button>
-        {message && <p className="admin-message" role="status">{message}</p>}
-      </section>
-    );
+    return <AdminAccessState state={{ mode }} />;
   }
 
   const deleteAllowed = entry.status === "draft" || entry.status === "archived";
 
   return (
-    <div className="admin-editor">
-      <header className="admin-header">
-        <div>
-          <h1>Admin</h1>
-          <p className="admin-meta">Markdown entry administration</p>
-        </div>
-        <button type="button" onClick={signOut} disabled={busy}>Sign out</button>
-      </header>
-
+    <AdminShell
+      activeTab="entries"
+      description="Markdown entry administration"
+      beforeSignOut={() =>
+        shouldDiscardUnsavedChanges(
+          hasPendingEditorChanges(dirty, scheduleDirty)
+        )
+      }
+    >
+      <div className="admin-editor">
       <div className="admin-layout">
         <aside className="admin-list" aria-label="Entries">
           <button type="button" onClick={newEntry} disabled={busy}>
@@ -1154,7 +1121,6 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         .admin-state ul { margin: 1rem 0 1.5rem 1.25rem; }
         .admin-editor button, .admin-state button { font: 0.8125rem var(--mono); padding: 0.45rem 0.7rem; border: 1px solid var(--hairline); border-radius: 4px; background: var(--code-bg); color: var(--ink); cursor: pointer; }
         .admin-editor button:disabled, .admin-state button:disabled { opacity: 0.45; cursor: default; }
-        .admin-header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
         .admin-layout { display: grid; grid-template-columns: minmax(13rem, 0.7fr) minmax(0, 2fr); gap: 1.5rem; margin-top: 1.5rem; }
         .admin-list { border-right: 1px solid var(--hairline); padding-right: 1rem; }
         .admin-list ul { list-style: none; margin-top: 0.75rem; }
@@ -1189,6 +1155,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         .admin-message { font: 0.8125rem var(--mono); color: var(--accent); }
         @media (max-width: 760px) { .admin-layout { grid-template-columns: 1fr; } .admin-list { border-right: 0; border-bottom: 1px solid var(--hairline); padding: 0 0 1rem; } .admin-grid { grid-template-columns: 1fr; } }
       `}</style>
-    </div>
+      </div>
+    </AdminShell>
   );
 }

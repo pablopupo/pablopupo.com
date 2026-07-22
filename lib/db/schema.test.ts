@@ -39,7 +39,7 @@ afterAll(async () => {
 describe.sequential("content schema migrations", () => {
   it("backfills sections and tags when upgrading a Task 2 database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(3);
+    expect(migrationFiles).toHaveLength(4);
     const client = await prepareDatabase(2);
 
     const inserted = await client.query<{ id: string; kind: string }>(
@@ -81,7 +81,7 @@ describe.sequential("content schema migrations", () => {
 
   it("backfills revision slugs when upgrading an existing database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(3);
+    expect(migrationFiles).toHaveLength(4);
     const client = await prepareDatabase(1);
 
     const inserted = await client.query<{ id: string }>(
@@ -112,6 +112,76 @@ describe.sequential("content schema migrations", () => {
       [inserted.rows[0]!.id]
     );
     expect(upgraded.rows).toEqual([{ version: 3 }]);
+  });
+
+  it("preserves existing profile settings when applying the profile seed", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(4);
+    const client = await prepareDatabase(3);
+    const avatar = await client.query<{ id: string }>(
+      `INSERT INTO media (storage_key, url, mime_type, alt_text)
+       VALUES ('custom/avatar.jpg', '/custom/avatar.jpg', 'image/jpeg', 'Custom portrait')
+       RETURNING id`
+    );
+    await client.query(
+      `INSERT INTO site_settings
+         (site_title, intro_markdown, about_markdown, contact_email, avatar_media_id)
+       VALUES ('Custom title', 'Custom intro', 'Custom about', 'custom@example.com', $1)`,
+      [avatar.rows[0]!.id]
+    );
+
+    await client.exec(fs.readFileSync(migrationFiles[3]!, "utf8"));
+
+    const settings = await client.query<Record<string, unknown>>(
+      `SELECT site_title, headline, location, graduation_on::text AS graduation_on, intro_markdown,
+              about_markdown, contact_email, github_url, linkedin_url,
+              youtube_url, avatar_media_id, resume_media_id, version
+       FROM site_settings`
+    );
+    expect(settings.rows).toEqual([
+      {
+        site_title: "Custom title",
+        headline: "Software Engineer, Applied AI",
+        location: "Miami, Florida",
+        graduation_on: "2026-12-01",
+        intro_markdown: "Custom intro",
+        about_markdown: "Custom about",
+        contact_email: "custom@example.com",
+        github_url: "https://github.com/pablopupo",
+        linkedin_url: "https://linkedin.com/in/pablopupo",
+        youtube_url: null,
+        avatar_media_id: avatar.rows[0]!.id,
+        resume_media_id: "8de31ccf-3422-497f-b1b1-9d3b61e5aa0a",
+        version: 1,
+      },
+    ]);
+  });
+
+  it("fills absent legacy contact and avatar values from the profile seed", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(4);
+    const client = await prepareDatabase(3);
+    await client.exec(
+      `INSERT INTO site_settings
+         (site_title, intro_markdown, about_markdown)
+       VALUES ('Custom title', 'Custom intro', 'Custom about')`
+    );
+
+    await client.exec(fs.readFileSync(migrationFiles[3]!, "utf8"));
+
+    const settings = await client.query<{
+      contact_email: string | null;
+      avatar_media_id: string | null;
+    }>(
+      `SELECT contact_email, avatar_media_id
+       FROM site_settings`
+    );
+    expect(settings.rows).toEqual([
+      {
+        contact_email: "pablofpupo23@gmail.com",
+        avatar_media_id: "4c6dfd5f-90bf-45fd-b922-fdf2e01b45fb",
+      },
+    ]);
   });
 
   it("creates every approved content table from generated SQL", async () => {
@@ -260,10 +330,10 @@ describe.sequential("content schema migrations", () => {
     const client = await migratedDatabase();
     if (!client) return;
 
-    await client.exec(
-      `INSERT INTO site_settings (site_title, intro_markdown)
-       VALUES ('Pablo Pupo', 'First')`
+    const settings = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM site_settings`
     );
+    expect(settings.rows[0]?.count).toBe(1);
     await expect(
       client.exec(
         `INSERT INTO site_settings (site_title, intro_markdown)

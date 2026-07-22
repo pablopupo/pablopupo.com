@@ -22,6 +22,13 @@
       "when": 1784738187270,
       "tag": "0002_sharp_blob",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784747082137,
+      "tag": "0003_safe_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }
