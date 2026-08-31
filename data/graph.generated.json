@@ -2,182 +2,70 @@
  "nodes": [
   {
    "id": "gradus-ad-parnassum",
-   "label": "gradus-ad-parnassum",
+   "label": "Gradus ad Parnassum",
    "type": "project",
    "href": "https://github.com/pablopupo/gradus-ad-parnassum",
-   "deg": 5
+   "deg": 3
   },
   {
    "id": "kit-ai",
-   "label": "kit-ai",
+   "label": "Kit AI",
    "type": "project",
    "href": "https://github.com/pablopupo/kit-ai",
-   "deg": 4
-  },
-  {
-   "id": "llama3-medical-3b-4bit",
-   "label": "llama3-medical-3b-4bit",
-   "type": "project",
-   "href": "https://huggingface.co/Pablo305/llama3-medical-3b-4bit",
    "deg": 3
   },
   {
    "id": "accordo",
-   "label": "accordo",
+   "label": "Accordo",
    "type": "project",
    "href": null,
    "deg": 2
   },
   {
    "id": "nova",
-   "label": "nova",
+   "label": "Nova",
    "type": "project",
    "href": "https://github.com/pablopupo/Nova",
    "deg": 1
   },
   {
-   "id": "subjugator-website",
-   "label": "subjugator.org",
-   "type": "project",
-   "href": "https://github.com/pablopupo/subjugator.org",
-   "deg": 0
-  },
-  {
-   "id": "bach-harmonization-judge",
-   "label": "bach-harmonization-judge",
-   "type": "project",
-   "href": "https://github.com/pablopupo/bach-harmonization-judge",
-   "deg": 2
-  },
-  {
-   "id": "classical-music-analyzer",
-   "label": "classical-music-analyzer",
-   "type": "project",
-   "href": "https://github.com/pablopupo/classical-music-analyzer",
-   "deg": 2
-  },
-  {
-   "id": "docling-3702",
-   "label": "docling #3702",
-   "type": "oss",
-   "href": "https://github.com/docling-project/docling/pull/3702",
-   "deg": 4
-  },
-  {
-   "id": "docling-3721",
-   "label": "docling #3721",
-   "type": "oss",
-   "href": "https://github.com/docling-project/docling/pull/3721",
-   "deg": 2
-  },
-  {
-   "id": "docling-boxnote",
-   "label": "docling boxnote backend",
-   "type": "oss",
-   "href": "https://github.com/docling-project/docling/pull/3722",
-   "deg": 3
-  },
-  {
-   "id": "vllm-47439",
-   "label": "vllm #47439",
-   "type": "oss",
-   "href": "https://github.com/vllm-project/vllm/pull/47439",
-   "deg": 3
-  },
-  {
-   "id": "sglang-29952",
-   "label": "sglang #29952",
-   "type": "oss",
-   "href": "https://github.com/sgl-project/sglang/pull/29952",
-   "deg": 1
-  },
-  {
-   "id": "typescript-sdk-2418",
-   "label": "typescript-sdk #2418",
-   "type": "oss",
-   "href": "https://github.com/modelcontextprotocol/typescript-sdk/pull/2418",
-   "deg": 3
-  },
-  {
    "id": "music",
-   "label": "music",
+   "label": "Music",
    "type": "concept",
    "href": null,
-   "deg": 4
+   "deg": 2
   },
   {
    "id": "notation",
-   "label": "notation",
-   "type": "concept",
-   "href": null,
-   "deg": 2
-  },
-  {
-   "id": "piano",
-   "label": "piano",
+   "label": "Musical notation",
    "type": "concept",
    "href": null,
    "deg": 1
   },
   {
    "id": "retrieval",
-   "label": "retrieval",
+   "label": "Retrieval",
    "type": "concept",
    "href": null,
    "deg": 2
-  },
-  {
-   "id": "evals",
-   "label": "evals",
-   "type": "concept",
-   "href": null,
-   "deg": 2
-  },
-  {
-   "id": "document-intelligence",
-   "label": "document intelligence",
-   "type": "concept",
-   "href": null,
-   "deg": 3
-  },
-  {
-   "id": "structured-extraction",
-   "label": "structured extraction",
-   "type": "concept",
-   "href": null,
-   "deg": 3
   },
   {
    "id": "on-device-ai",
-   "label": "on-device AI",
+   "label": "On-device AI",
    "type": "concept",
    "href": null,
-   "deg": 2
-  },
-  {
-   "id": "inference",
-   "label": "inference",
-   "type": "concept",
-   "href": null,
-   "deg": 4
-  },
-  {
-   "id": "mcp",
-   "label": "MCP",
-   "type": "concept",
-   "href": null,
-   "deg": 2
+   "deg": 1
   },
   {
    "id": "emergency-medicine",
-   "label": "emergency medicine",
+   "label": "Emergency medicine",
    "type": "concept",
    "href": null,
-   "deg": 2
+   "deg": 1
   },
   {
    "id": "payments",
-   "label": "payments",
+   "label": "Payments",
    "type": "concept",
    "href": null,
    "deg": 2
@@ -196,17 +84,7 @@
   },
   {
    "s": "gradus-ad-parnassum",
-   "t": "piano",
-   "kind": "tag"
-  },
-  {
-   "s": "gradus-ad-parnassum",
    "t": "retrieval",
-   "kind": "tag"
-  },
-  {
-   "s": "gradus-ad-parnassum",
-   "t": "evals",
    "kind": "tag"
   },
   {
@@ -222,26 +100,6 @@
   {
    "s": "kit-ai",
    "t": "emergency-medicine",
-   "kind": "tag"
-  },
-  {
-   "s": "kit-ai",
-   "t": "inference",
-   "kind": "tag"
-  },
-  {
-   "s": "llama3-medical-3b-4bit",
-   "t": "on-device-ai",
-   "kind": "tag"
-  },
-  {
-   "s": "llama3-medical-3b-4bit",
-   "t": "emergency-medicine",
-   "kind": "tag"
-  },
-  {
-   "s": "llama3-medical-3b-4bit",
-   "t": "inference",
    "kind": "tag"
   },
   {
@@ -258,106 +116,6 @@
    "s": "nova",
    "t": "payments",
    "kind": "tag"
-  },
-  {
-   "s": "bach-harmonization-judge",
-   "t": "music",
-   "kind": "tag"
-  },
-  {
-   "s": "bach-harmonization-judge",
-   "t": "evals",
-   "kind": "tag"
-  },
-  {
-   "s": "classical-music-analyzer",
-   "t": "music",
-   "kind": "tag"
-  },
-  {
-   "s": "classical-music-analyzer",
-   "t": "notation",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-3702",
-   "t": "document-intelligence",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-3702",
-   "t": "structured-extraction",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-3721",
-   "t": "document-intelligence",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-3721",
-   "t": "structured-extraction",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-boxnote",
-   "t": "document-intelligence",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-boxnote",
-   "t": "structured-extraction",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-boxnote",
-   "t": "mcp",
-   "kind": "tag"
-  },
-  {
-   "s": "vllm-47439",
-   "t": "inference",
-   "kind": "tag"
-  },
-  {
-   "s": "sglang-29952",
-   "t": "inference",
-   "kind": "tag"
-  },
-  {
-   "s": "typescript-sdk-2418",
-   "t": "mcp",
-   "kind": "tag"
-  },
-  {
-   "s": "docling-3702",
-   "t": "typescript-sdk-2418",
-   "kind": "semantic",
-   "terms": [
-    "fix",
-    "regression",
-    "tests"
-   ]
-  },
-  {
-   "s": "vllm-47439",
-   "t": "typescript-sdk-2418",
-   "kind": "semantic",
-   "terms": [
-    "fix",
-    "regression",
-    "tests"
-   ]
-  },
-  {
-   "s": "docling-3702",
-   "t": "vllm-47439",
-   "kind": "semantic",
-   "terms": [
-    "fix",
-    "regression",
-    "tests"
-   ]
   }
  ]
 }

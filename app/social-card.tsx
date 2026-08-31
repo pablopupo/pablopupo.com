@@ -68,7 +68,7 @@ export function SocialCard({ profile }: { profile: PublicProfile }) {
             fontSize: 23,
           }}
         >
-          Applied AI&nbsp;&nbsp;·&nbsp;&nbsp;Open source&nbsp;&nbsp;·&nbsp;&nbsp;Classical piano
+          Applied AI&nbsp;&nbsp;·&nbsp;&nbsp;Software&nbsp;&nbsp;·&nbsp;&nbsp;Classical piano
         </div>
         {identity.location ? (
           <div

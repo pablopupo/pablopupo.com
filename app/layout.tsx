@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Link from "next/link";
 import { cache } from "react";
 import PageViewTracker from "@/components/page-view-tracker";
 import VercelAnalytics from "@/components/vercel-analytics";
 import Nav from "./nav";
+import RouteTransition from "./route-transition";
 import { createRootMetadata } from "@/lib/metadata";
 import { getPublicProfile } from "@/lib/public-profile";
 import { createSiteIdentity, serializeJsonLd } from "@/lib/site";
+import { themeBootstrapScript } from "./theme";
 import "./globals.css";
 
 const newsreader = localFont({
@@ -33,7 +36,15 @@ export default async function RootLayout({
   const profile = await readPublicProfile();
   const identity = createSiteIdentity(profile);
   return (
-    <html lang="en" className={newsreader.variable}>
+    <html
+      lang="en"
+      className={newsreader.variable}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
       <body>
         <script
           type="application/ld+json"
@@ -47,18 +58,20 @@ export default async function RootLayout({
         <header>
           <Nav />
         </header>
-        <main id="main-content">{children}</main>
+        <main id="main-content">
+          <RouteTransition>{children}</RouteTransition>
+        </main>
         <footer>
           {profile.githubUrl ? <a href={profile.githubUrl}>GitHub</a> : null}
           {profile.linkedinUrl ? (
             <a href={profile.linkedinUrl}>LinkedIn</a>
           ) : null}
           {profile.youtubeUrl ? <a href={profile.youtubeUrl}>YouTube</a> : null}
-          <a href="/resume">Resume</a>
+          <Link href="/resume">Resume</Link>
           {profile.contactEmail ? (
             <a href={`mailto:${profile.contactEmail}`}>Email</a>
           ) : null}
-          <a href="/rss.xml">RSS</a>
+          <Link href="/rss.xml">RSS</Link>
         </footer>
         <PageViewTracker />
         <VercelAnalytics />

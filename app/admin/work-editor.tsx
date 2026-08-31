@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { preparePreviewWindow } from "@/lib/admin/preview-window";
 import { AdminShell } from "./admin-shell";
 import MarkdownEditor, { type MarkdownSnapshot } from "./markdown-editor";
 
@@ -58,7 +59,32 @@ type ProjectSaveResult =
   | { status: "conflict"; message: string }
   | { status: "error"; message: string };
 
+type ProjectSaveOutcome = {
+  project: EditorProject;
+  changedDuringRequest: boolean;
+};
+
 type PublicationAction = "publish" | "schedule" | "unpublish" | "archive";
+
+export async function saveAndPreviewProject(
+  save: () => Promise<ProjectSaveOutcome | null>,
+  prepare: () => ReturnType<typeof preparePreviewWindow> = preparePreviewWindow
+) {
+  const preview = prepare();
+  let saved: ProjectSaveOutcome | null;
+  try {
+    saved = await save();
+  } catch {
+    preview.cancel();
+    return false;
+  }
+  if (!saved || saved.changedDuringRequest || !saved.project.id) {
+    preview.cancel();
+    return false;
+  }
+  preview.show(`/admin/preview/work/${saved.project.id}`);
+  return true;
+}
 
 function blankProject(): EditorProject {
   return {
@@ -431,14 +457,14 @@ export default function WorkEditor() {
   ) {
     if (!candidate.title.trim() || !candidate.slug.trim()) {
       setMessage("Title and slug are required");
-      return false;
+      return null;
     }
     if (
       (candidate.status === "scheduled" || candidate.status === "published") &&
       !candidate.publishedAt
     ) {
       setMessage("Scheduled and published projects need a publication time");
-      return false;
+      return null;
     }
     setBusy(true);
     setMessage("");
@@ -464,14 +490,14 @@ export default function WorkEditor() {
         replaceProject(result.project);
         setMessage(successMessage);
       }
-      await loadProjects();
+      void loadProjects();
       setBusy(false);
-      return true;
+      return { project: result.project, changedDuringRequest };
     }
     setConflict(result.status === "conflict");
     setMessage(result.message);
     setBusy(false);
-    return false;
+    return null;
   }
 
   async function runPublicationAction(action: PublicationAction) {
@@ -580,6 +606,10 @@ export default function WorkEditor() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await saveProject();
+  }
+
+  async function previewProject() {
+    await saveAndPreviewProject(() => saveProject());
   }
 
   return (
@@ -902,6 +932,13 @@ export default function WorkEditor() {
           <div className="work-admin-actions">
             <button type="submit" disabled={busy || conflict || !dirty}>
               {project.id ? "Save project" : "Create draft"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void previewProject()}
+              disabled={busy || conflict}
+            >
+              Save &amp; Preview
             </button>
             {conflict && project.id && (
               <button

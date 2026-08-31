@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicEntryPage } from "@/components/public-entry-page";
 import { createEntryMetadata } from "@/lib/metadata";
-import { getPublicEntry } from "@/lib/public-content";
+import {
+  entryNeighbors,
+  getPublicEntries,
+  getPublicEntry,
+} from "@/lib/public-content";
 
 export const revalidate = 60;
 
@@ -23,8 +27,12 @@ export default async function MusicEntryPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const entry = await getPublicEntry(slug);
+  const [entry, entries] = await Promise.all([
+    getPublicEntry(slug),
+    getPublicEntries(),
+  ]);
   if (!entry || entry.section !== "music") notFound();
+  const neighbors = entryNeighbors(entries, entry);
 
-  return <PublicEntryPage entry={entry} />;
+  return <PublicEntryPage entry={entry} {...neighbors} />;
 }

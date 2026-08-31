@@ -39,7 +39,7 @@ afterAll(async () => {
 describe.sequential("content schema migrations", () => {
   it("backfills sections and tags when upgrading a Task 2 database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(8);
     const client = await prepareDatabase(2);
 
     const inserted = await client.query<{ id: string; kind: string }>(
@@ -81,7 +81,7 @@ describe.sequential("content schema migrations", () => {
 
   it("backfills revision slugs when upgrading an existing database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(8);
     const client = await prepareDatabase(1);
 
     const inserted = await client.query<{ id: string }>(
@@ -116,7 +116,7 @@ describe.sequential("content schema migrations", () => {
 
   it("preserves existing profile settings when applying the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(8);
     const client = await prepareDatabase(3);
     const avatar = await client.query<{ id: string }>(
       `INSERT INTO media (storage_key, url, mime_type, alt_text)
@@ -159,7 +159,7 @@ describe.sequential("content schema migrations", () => {
 
   it("fills absent legacy contact and avatar values from the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(8);
     const client = await prepareDatabase(3);
     await client.exec(
       `INSERT INTO site_settings
@@ -186,7 +186,7 @@ describe.sequential("content schema migrations", () => {
 
   it("adds global rate-limit buckets when upgrading the existing schema", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(8);
     const client = await prepareDatabase(4);
 
     await client.exec(fs.readFileSync(migrationFiles[4]!, "utf8"));
@@ -197,6 +197,105 @@ describe.sequential("content schema migrations", () => {
        WHERE table_schema = 'public' AND table_name = 'rate_limit_buckets'`
     );
     expect(tables.rows).toEqual([{ table_name: "rate_limit_buckets" }]);
+  });
+
+  it("updates the seeded introduction without overwriting UI-managed copy", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(8);
+    let client = await prepareDatabase(5);
+
+    await client.exec(fs.readFileSync(migrationFiles[5]!, "utf8"));
+
+    const updated = await client.query<{
+      intro_markdown: string;
+      version: number;
+    }>(
+      `SELECT intro_markdown, version
+       FROM site_settings`
+    );
+    expect(updated.rows).toEqual([
+      {
+        intro_markdown:
+          "I’m an AI engineer currently building applied AI systems in healthcare. I share projects, open-source work, and technical notes, alongside classical piano performances and writing about music.",
+        version: 2,
+      },
+    ]);
+
+    client = await prepareDatabase(5);
+    await client.exec(
+      `UPDATE site_settings
+       SET intro_markdown = 'Introduction saved from the UI.'`
+    );
+    await client.exec(fs.readFileSync(migrationFiles[5]!, "utf8"));
+
+    const preserved = await client.query<{
+      intro_markdown: string;
+      version: number;
+    }>(
+      `SELECT intro_markdown, version
+       FROM site_settings`
+    );
+    expect(preserved.rows).toEqual([
+      {
+        intro_markdown: "Introduction saved from the UI.",
+        version: 1,
+      },
+    ]);
+  });
+
+  it("repositions the public profile without overwriting UI-managed copy", async () => {
+    const migrationFiles = getMigrationFiles();
+    expect(migrationFiles).toHaveLength(8);
+    let client = await prepareDatabase(6);
+
+    await client.exec(fs.readFileSync(migrationFiles[6]!, "utf8"));
+
+    const updated = await client.query<{
+      headline: string;
+      intro_markdown: string;
+      about_markdown: string;
+      version: number;
+    }>(
+      `SELECT headline, intro_markdown, about_markdown, version
+       FROM site_settings`
+    );
+    expect(updated.rows).toEqual([
+      {
+        headline: "AI Engineer at Handtevy",
+        intro_markdown:
+          "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
+        about_markdown:
+          "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
+        version: 3,
+      },
+    ]);
+
+    client = await prepareDatabase(6);
+    await client.exec(
+      `UPDATE site_settings
+       SET headline = 'Headline saved from the UI.',
+           intro_markdown = 'Introduction saved from the UI.',
+           about_markdown = 'About copy saved from the UI.'`
+    );
+    await client.exec(fs.readFileSync(migrationFiles[6]!, "utf8"));
+
+    const preserved = await client.query<{
+      headline: string;
+      intro_markdown: string;
+      about_markdown: string;
+      version: number;
+    }>(
+      `SELECT headline, intro_markdown, about_markdown, version
+       FROM site_settings`
+    );
+    expect(preserved.rows).toEqual([
+      {
+        headline: "Headline saved from the UI.",
+        intro_markdown: "Introduction saved from the UI.",
+        about_markdown: "About copy saved from the UI.",
+        version: 2,
+      },
+    ]);
   });
 
   it("creates every approved content table from generated SQL", async () => {
@@ -554,5 +653,133 @@ describe.sequential("content schema migrations", () => {
         ["b".repeat(64)]
       )
     ).rejects.toThrow();
+  });
+
+  it("stores editable graph state without weakening content ownership", async () => {
+    expect(getMigrationFiles(), "generated SQL migrations").not.toHaveLength(0);
+    const client = await migratedDatabase();
+    if (!client) return;
+
+    const nodeColumns = await client.query<{
+      column_name: string;
+      is_nullable: string;
+    }>(
+      `SELECT column_name, is_nullable
+       FROM information_schema.columns
+       WHERE table_name = 'knowledge_graph_nodes'
+       ORDER BY ordinal_position`
+    );
+    expect(nodeColumns.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ column_name: "project_id", is_nullable: "YES" }),
+        expect.objectContaining({ column_name: "entry_id", is_nullable: "YES" }),
+        expect.objectContaining({ column_name: "origin", is_nullable: "NO" }),
+        expect.objectContaining({ column_name: "state", is_nullable: "NO" }),
+        expect.objectContaining({ column_name: "label_override", is_nullable: "YES" }),
+        expect.objectContaining({ column_name: "summary_override", is_nullable: "YES" }),
+        expect.objectContaining({ column_name: "pinned", is_nullable: "NO" }),
+        expect.objectContaining({ column_name: "version", is_nullable: "NO" }),
+      ])
+    );
+
+    const edgeColumns = await client.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_name = 'knowledge_graph_edges'
+       ORDER BY ordinal_position`
+    );
+    expect(edgeColumns.rows.map((row) => row.column_name)).toEqual(
+      expect.arrayContaining(["origin", "state", "updated_at", "version"])
+    );
+  });
+
+  it("upgrades existing graph content into the living map", async () => {
+    const migrationFiles = getMigrationFiles();
+    const client = await prepareDatabase(7);
+    const project = await client.query<{ id: string }>(
+      `INSERT INTO projects
+         (slug, kind, status, title, body_markdown, published_at)
+       VALUES
+         ('existing-project', 'project', 'published', 'Existing project', '', '2026-07-22T12:00:00Z')
+       RETURNING id`
+    );
+    const entry = await client.query<{ id: string }>(
+      `INSERT INTO entries
+         (slug, kind, section, status, title, body_markdown, published_at)
+       VALUES
+         ('existing-note', 'note', 'writing', 'published', 'Existing note', '', '2026-07-22T12:00:00Z')
+       RETURNING id`
+    );
+    await client.query(
+      `INSERT INTO knowledge_graph_nodes (key, label, kind)
+       VALUES
+         ('existing-project', 'Existing project', 'project'),
+         ('existing-note', 'Existing note', 'writing'),
+         ('docling-example', 'docling example', 'oss')`
+    );
+
+    await client.exec(fs.readFileSync(migrationFiles[7]!, "utf8"));
+
+    const upgraded = await client.query<{
+      key: string;
+      project_id: string | null;
+      entry_id: string | null;
+      origin: string;
+      state: string;
+      pinned: boolean;
+    }>(
+      `SELECT key, project_id, entry_id, origin, state, pinned
+       FROM knowledge_graph_nodes
+       WHERE key IN (
+         'existing-project',
+         'existing-note',
+         'docling-example',
+         'applied-ai',
+         'music'
+       )
+       ORDER BY key`
+    );
+    expect(upgraded.rows).toEqual([
+      {
+        key: "applied-ai",
+        project_id: null,
+        entry_id: null,
+        origin: "manual",
+        state: "public",
+        pinned: true,
+      },
+      {
+        key: "docling-example",
+        project_id: null,
+        entry_id: null,
+        origin: "manual",
+        state: "hidden",
+        pinned: false,
+      },
+      {
+        key: "existing-note",
+        project_id: null,
+        entry_id: entry.rows[0]!.id,
+        origin: "automatic",
+        state: "public",
+        pinned: false,
+      },
+      {
+        key: "existing-project",
+        project_id: project.rows[0]!.id,
+        entry_id: null,
+        origin: "automatic",
+        state: "public",
+        pinned: false,
+      },
+      {
+        key: "music",
+        project_id: null,
+        entry_id: null,
+        origin: "manual",
+        state: "public",
+        pinned: true,
+      },
+    ]);
   });
 }, PGLITE_TEST_TIMEOUT_MS);

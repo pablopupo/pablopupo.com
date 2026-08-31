@@ -48,13 +48,13 @@ type PublicProfileReaderDependencies = {
 
 export const DEFAULT_PUBLIC_PROFILE: Readonly<PublicProfile> = Object.freeze({
   siteTitle: "Pablo Pupo",
-  headline: "Software Engineer, Applied AI",
+  headline: "AI Engineer at Handtevy",
   location: "Miami, Florida",
   graduationOn: "2026-12-01",
   introMarkdown:
-    "I’m a software engineer focused on applied AI, open source, and reliable systems. I’m also a classical pianist.",
+    "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
   aboutMarkdown:
-    "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I contribute to open source and write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
+    "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
   contactEmail: "pablofpupo23@gmail.com",
   githubUrl: "https://github.com/pablopupo",
   linkedinUrl: "https://linkedin.com/in/pablopupo",

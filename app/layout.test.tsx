@@ -15,6 +15,12 @@ vi.mock("./nav", () => ({
   default: () => <nav>Navigation</nav>,
 }));
 
+vi.mock("./route-transition", () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-route-transition="true">{children}</div>
+  ),
+}));
+
 vi.mock("@/components/vercel-analytics", () => ({
   default: () => <span data-vercel-analytics="enabled" />,
 }));
@@ -59,7 +65,37 @@ describe("root layout discovery metadata", () => {
     expect(html).toContain('data-first-party-analytics="enabled"');
     expect(html).toContain('<a class="skip-link" href="#main-content">');
     expect(html).toContain('<main id="main-content">');
-    expect(html).not.toContain("Handtevy");
+    expect(html).toContain('"jobTitle":"AI Engineer at Handtevy"');
+  });
+
+  it("lets the header crossfade with the route while preserving scroll handling", async () => {
+    const { default: RootLayout } = await import("./layout");
+
+    const html = renderToStaticMarkup(
+      await RootLayout({ children: <p>Page</p> })
+    );
+
+    expect(html).toContain("<header><nav>Navigation</nav></header>");
+    expect(html).not.toContain("view-transition-name:site-header");
+    expect(html).toContain('data-scroll-behavior="smooth"');
+    expect(html).toContain(
+      '<main id="main-content"><div data-route-transition="true"><p>Page</p></div></main>'
+    );
+  });
+
+  it("restores a saved theme in the document head before body content", async () => {
+    const { default: RootLayout } = await import("./layout");
+
+    const html = renderToStaticMarkup(
+      await RootLayout({ children: <p>Page</p> })
+    );
+
+    const themeScript = html.indexOf("pablo-color-theme");
+    const body = html.indexOf("<body");
+
+    expect(themeScript).toBeGreaterThan(-1);
+    expect(themeScript).toBeLessThan(body);
+    expect(html).toContain("data-theme");
   });
 
   it("renders only UI-managed footer links", async () => {

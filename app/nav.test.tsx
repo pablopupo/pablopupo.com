@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe("site navigation", () => {
-  it("keeps the wordmark visible and exposes the four public sections", () => {
+  it("keeps the wordmark visible and exposes Home plus the four public sections", () => {
     pathname = "/writing/example";
 
     const html = renderToStaticMarkup(<Nav />);
@@ -39,6 +39,7 @@ describe("site navigation", () => {
     expect(html).toContain(
       '<a href="/" data-next-link="true" class="wordmark">Pablo Pupo</a>'
     );
+    expect(html).toContain('<a href="/" data-next-link="true">Home</a>');
     expect(html).toContain('<a href="/work" data-next-link="true">Work</a>');
     expect(html).toContain(
       '<a href="/writing" data-next-link="true" aria-current="page">Writing</a>'
@@ -49,12 +50,36 @@ describe("site navigation", () => {
     expect(html).not.toContain("Contributions");
   });
 
-  it("provides a compact labeled search control", () => {
+  it("marks Home current only on the homepage", () => {
+    pathname = "/";
+    const homeHtml = renderToStaticMarkup(<Nav />);
+
+    pathname = "/writing";
+    const writingHtml = renderToStaticMarkup(<Nav />);
+
+    expect(homeHtml).toContain(
+      '<a href="/" data-next-link="true" aria-current="page">Home</a>'
+    );
+    expect(writingHtml).toContain('<a href="/" data-next-link="true">Home</a>');
+  });
+
+  it("provides an accessible inline-search toggle instead of a search-page link", () => {
     const html = renderToStaticMarkup(<Nav />);
 
-    expect(html).toContain('href="/search"');
+    expect(html).toContain('type="button"');
     expect(html).toContain('aria-label="Search this site"');
-    expect(html).toContain("Search");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('aria-controls="header-search-panel"');
+    expect(html).not.toContain('href="/search"');
+  });
+
+  it("keeps navigation links separate from search and theme actions", () => {
+    const html = renderToStaticMarkup(<Nav />);
+
+    expect(html).toContain('class="nav-links"');
+    expect(html).toContain('class="nav-actions"');
+    expect(html).toContain('class="theme-toggle"');
+    expect(html).toContain('aria-label="Switch color theme"');
   });
 
   it("uses plain anchors on admin paths so dirty editors receive beforeunload", () => {
@@ -64,6 +89,7 @@ describe("site navigation", () => {
 
     expect(html).not.toContain('data-next-link="true"');
     expect(html).toContain('<a href="/" class="wordmark">Pablo Pupo</a>');
+    expect(html).toContain('<a href="/">Home</a>');
     expect(html).toContain('<a href="/work">Work</a>');
     expect(html).toContain('<a href="/writing">Writing</a>');
   });

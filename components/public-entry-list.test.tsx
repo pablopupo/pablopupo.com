@@ -1,5 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./view-transition", () => ({
+  NamedViewTransition: ({
+    name,
+    children,
+  }: {
+    name: string;
+    children: React.ReactNode;
+  }) => <span data-transition-name={name}>{children}</span>,
+}));
 
 const entries = [
   {
@@ -27,10 +37,28 @@ describe("public entry views", () => {
 
     expect(html).toContain('href="/writing/tool-calls"');
     expect(html).toContain("Tool calls and response schemas");
+    expect(html).toContain('dateTime="2026-07-02T12:00:00.000Z"');
     expect(html).toContain("July 2, 2026");
     expect(html).toContain("6 min read");
     expect(html).toContain("What broke, how I reproduced it, and the fix.");
     expect(html).toContain("vLLM · structured outputs");
+
+    const titleIndex = html.indexOf("Tool calls and response schemas");
+    const dateIndex = html.indexOf("July 2, 2026");
+    const summaryIndex = html.indexOf(
+      "What broke, how I reproduced it, and the fix."
+    );
+    const tagsIndex = html.indexOf("vLLM · structured outputs");
+
+    expect(titleIndex).toBeLessThan(dateIndex);
+    expect(dateIndex).toBeLessThan(summaryIndex);
+    expect(summaryIndex).toBeLessThan(tagsIndex);
+    expect(html).toContain('class="entry-title-link"');
+    expect(html).toContain(
+      'data-transition-name="entry-writing-tool-calls"'
+    );
+    expect(html).toContain('class="entry-meta entry-meta-primary"');
+    expect(html).toContain('class="entry-tags"');
   });
 
   it("gives an empty collection a useful message", async () => {

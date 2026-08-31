@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import KnowledgeGraph from "@/components/knowledge-graph";
 import MarkdownContent from "@/components/markdown-content";
+import ProfileLinks from "@/components/profile-links";
 import { PublicEntryList } from "@/components/public-entry-list";
-import { OpenSourceList, ProjectList } from "@/components/public-work";
-import { getLiveContributions } from "@/lib/github-status";
+import { ProjectList } from "@/components/public-work";
 import { createPublicAlternates } from "@/lib/metadata";
 import { getPublicEntries, getPublicProjects } from "@/lib/public-content";
-import { buildPublicGraph } from "@/lib/public-graph";
+import { getPublicGraph } from "@/lib/public-graph";
 import { getPublicProfile } from "@/lib/public-profile";
 
 export const revalidate = 60;
@@ -14,17 +15,6 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   alternates: createPublicAlternates("/"),
 };
-
-function graduationLabel(value: string | null) {
-  if (!value) return null;
-  const [year, month] = value.split("-").map(Number);
-  if (!year || !month || month < 1 || month > 12) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
-}
 
 export function selectSelectedProjects<T extends { featured: boolean }>(
   projects: T[]
@@ -36,11 +26,10 @@ export function selectSelectedProjects<T extends { featured: boolean }>(
 }
 
 export default async function Home() {
-  const [profile, projects, entries, contributions] = await Promise.all([
+  const [profile, projects, entries] = await Promise.all([
     getPublicProfile(),
     getPublicProjects(),
     getPublicEntries(),
-    getLiveContributions(),
   ]);
   const writing = entries
     .filter((entry) => entry.section === "writing")
@@ -48,67 +37,44 @@ export default async function Home() {
   const music = entries
     .filter((entry) => entry.section === "music")
     .slice(0, 3);
-  const graph = buildPublicGraph(projects, entries);
-  const graduation = graduationLabel(profile.graduationOn);
+  const graph = await getPublicGraph(projects, entries);
 
   return (
     <div className="home-page">
-      <section className="hero" aria-labelledby="home-title">
-        <div className="portrait-frame">
-          <img
-            src={profile.portraitUrl}
-            alt={profile.portraitAlt}
-            width={680}
-            height={680}
-            fetchPriority="high"
-          />
-        </div>
-        <div className="hero-copy">
-          <p className="eyebrow">{profile.siteTitle}</p>
-          <h1 id="home-title">{profile.headline}</h1>
-          <MarkdownContent markdown={profile.introMarkdown} />
-          <dl className="profile-facts">
-            {profile.location && (
-              <div>
-                <dt>Based in</dt>
-                <dd>{profile.location}</dd>
-              </div>
-            )}
-            {graduation && (
-              <div>
-                <dt>Graduation</dt>
-                <dd>{graduation}</dd>
-              </div>
-            )}
-          </dl>
-          <p className="profile-links">
-            <a href="/resume">Resume</a>
-            {profile.contactEmail && (
-              <a href={`mailto:${profile.contactEmail}`}>Email</a>
-            )}
-            {profile.githubUrl && <a href={profile.githubUrl}>GitHub</a>}
-            {profile.linkedinUrl && <a href={profile.linkedinUrl}>LinkedIn</a>}
-          </p>
-        </div>
-      </section>
-
-      <section className="graph-section" aria-labelledby="connections-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Explore</p>
-            <h2 id="connections-title">Knowledge graph</h2>
+      <section className="home-introduction" aria-labelledby="home-title">
+        <div className="hero">
+          <Link
+            href="/about"
+            className="portrait-link"
+            aria-label="About Pablo Pupo"
+          >
+            <div className="portrait-frame">
+              <img
+                src={profile.portraitUrl}
+                alt={profile.portraitAlt}
+                width={680}
+                height={680}
+                fetchPriority="high"
+              />
+            </div>
+          </Link>
+          <div className="hero-copy">
+            <h1 id="home-title" className="visually-hidden">
+              {profile.siteTitle}
+            </h1>
+            <MarkdownContent markdown={profile.introMarkdown} />
+            <ProfileLinks profile={profile} />
           </div>
-          <p>
-            Projects, technical notes, music, and the ideas connecting them.
-          </p>
         </div>
-        <KnowledgeGraph data={graph} />
+        <div className="home-connections">
+          <KnowledgeGraph data={graph} />
+        </div>
       </section>
 
       <section className="home-section" aria-labelledby="selected-work-title">
         <div className="section-heading">
           <h2 id="selected-work-title">Selected work</h2>
-          <a href="/work">All work</a>
+          <Link href="/work">All work</Link>
         </div>
         <ProjectList projects={selectSelectedProjects(projects)} compact />
       </section>
@@ -116,7 +82,7 @@ export default async function Home() {
       <section className="home-section" aria-labelledby="recent-writing-title">
         <div className="section-heading">
           <h2 id="recent-writing-title">Recent writing</h2>
-          <a href="/writing">All writing</a>
+          <Link href="/writing">All writing</Link>
         </div>
         <PublicEntryList
           entries={writing}
@@ -127,17 +93,9 @@ export default async function Home() {
       <section className="home-section" aria-labelledby="recent-music-title">
         <div className="section-heading">
           <h2 id="recent-music-title">Recent music</h2>
-          <a href="/music">All music</a>
+          <Link href="/music">All music</Link>
         </div>
         <PublicEntryList entries={music} emptyMessage="Music is coming soon." />
-      </section>
-
-      <section className="home-section" aria-labelledby="open-source-title">
-        <div className="section-heading">
-          <h2 id="open-source-title">Open source</h2>
-          <a href="/work#open-source">All contributions</a>
-        </div>
-        <OpenSourceList contributions={contributions} limit={3} />
       </section>
     </div>
   );

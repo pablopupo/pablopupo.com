@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ProjectList } from "./public-work";
+import { OpenSourceList, ProjectList } from "./public-work";
 
 const project = {
   id: "project-id",
@@ -64,5 +64,14 @@ describe("public work", () => {
     expect(html).toContain("Experience");
     expect(html).toContain("Example AI Lab");
     expect(html).toContain("June 2025 to Present");
+  });
+
+  it("keeps the empty contribution archive understated", () => {
+    const html = renderToStaticMarkup(
+      <OpenSourceList contributions={[]} />
+    );
+
+    expect(html).toContain("Contributions will appear here.");
+    expect(html).not.toContain("Open-source work");
   });
 });

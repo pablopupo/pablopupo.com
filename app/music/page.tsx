@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import MarkdownContent from "@/components/markdown-content";
+import Link from "next/link";
 import {
   formatEditorialDate,
   PublicEntryList,
   YoutubeEmbed,
 } from "@/components/public-entry-list";
+import { NamedViewTransition } from "@/components/view-transition";
 import {
   getPublicEntries,
   type PublicEntry,
@@ -35,7 +36,7 @@ export default async function Music() {
 
   return (
     <div className="public-index music-index">
-      <header className="page-header reading-shell">
+      <header className="page-header section-index-header">
         <p className="eyebrow">Piano</p>
         <h1>Music</h1>
         <p>
@@ -59,7 +60,13 @@ export default async function Music() {
                         {performance.workTitle} · {performance.composer}
                       </p>
                       <h3>
-                        <a href={`/music/${entry.slug}`}>{entry.title}</a>
+                        <NamedViewTransition
+                          name={`entry-${entry.section}-${entry.slug}`}
+                        >
+                          <Link href={`/music/${entry.slug}`}>
+                            {entry.title}
+                          </Link>
+                        </NamedViewTransition>
                       </h3>
                     </div>
                     {performance.performedAt && (
@@ -74,9 +81,6 @@ export default async function Music() {
                   />
                   {entry.summary && (
                     <p className="performance-summary">{entry.summary}</p>
-                  )}
-                  {performance.notesMarkdown && (
-                    <MarkdownContent markdown={performance.notesMarkdown} />
                   )}
                 </article>
               );

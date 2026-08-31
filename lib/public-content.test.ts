@@ -24,6 +24,52 @@ async function moduleUnderTest() {
 }
 
 describe("public content reader", () => {
+  it("finds same-section neighbors by publication date without mutating entries", async () => {
+    const module = await import("./public-content").catch(() => undefined);
+    expect(module?.entryNeighbors).toBeTypeOf("function");
+
+    const entries = [
+      {
+        slug: "older-writing",
+        section: "writing" as const,
+        publishedAt: "2026-07-01T12:00:00.000Z",
+      },
+      {
+        slug: "music-between",
+        section: "music" as const,
+        publishedAt: "2026-07-18T12:00:00.000Z",
+      },
+      {
+        slug: "current-writing",
+        section: "writing" as const,
+        publishedAt: "2026-07-15T12:00:00.000Z",
+      },
+      {
+        slug: "newer-writing",
+        section: "writing" as const,
+        publishedAt: "2026-07-20T12:00:00.000Z",
+      },
+    ];
+    const originalOrder = entries.map((entry) => entry.slug);
+
+    expect(
+      module!.entryNeighbors(entries, {
+        slug: "current-writing",
+        section: "writing",
+      })
+    ).toEqual({
+      newer: entries[3],
+      older: entries[0],
+    });
+    expect(entries.map((entry) => entry.slug)).toEqual(originalOrder);
+    expect(
+      module!.entryNeighbors(entries, {
+        slug: "missing",
+        section: "writing",
+      })
+    ).toEqual({ newer: null, older: null });
+  });
+
   it("normalizes legacy entries and projects without opening the database", async () => {
     const module = await moduleUnderTest();
     const getRepository = vi.fn();
@@ -44,6 +90,7 @@ describe("public content reader", () => {
         title: "Legacy project",
         bodyMarkdown: "Project body",
         publishedAt: new Date("2026-07-02T00:00:00.000Z"),
+        featured: true,
         technologies: ["TypeScript"],
         links: [
           {
@@ -94,7 +141,7 @@ describe("public content reader", () => {
         startedOn: null,
         endedOn: null,
         publishedAt: "2026-07-02T00:00:00.000Z",
-        featured: false,
+        featured: true,
         technologies: ["TypeScript"],
         links: [
           {

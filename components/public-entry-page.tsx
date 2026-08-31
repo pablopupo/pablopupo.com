@@ -1,24 +1,52 @@
+import Link from "next/link";
 import MarkdownContent from "@/components/markdown-content";
 import Comments from "@/components/comments";
+import ReadingProgress from "@/components/reading-progress";
+import { NamedViewTransition } from "@/components/view-transition";
 import {
   formatEditorialDate,
   YoutubeEmbed,
 } from "@/components/public-entry-list";
 import type { PublicEntry } from "@/lib/public-content";
 
-export function PublicEntryPage({ entry }: { entry: PublicEntry }) {
+type PublicEntryPageProps = {
+  entry: PublicEntry;
+  newer?: PublicEntry | null;
+  older?: PublicEntry | null;
+  preview?: boolean;
+};
+
+export function PublicEntryPage({
+  entry,
+  newer = null,
+  older = null,
+  preview = false,
+}: PublicEntryPageProps) {
   return (
     <article className="entry-page reading-shell">
+      {entry.readMinutes >= 6 ? (
+        <ReadingProgress targetId="entry-content" />
+      ) : null}
       <header className="entry-header">
         <p className="eyebrow">
-          {entry.section === "music" ? "Music" : "Writing"}
+          <Link href={`/${entry.section}`}>
+            {entry.section === "music" ? "Music" : "Writing"}
+          </Link>
         </p>
-        <h1>{entry.title}</h1>
+        <NamedViewTransition
+          name={`entry-${entry.section}-${entry.slug}`}
+        >
+          <h1>{entry.title}</h1>
+        </NamedViewTransition>
         {entry.summary && <p className="entry-deck">{entry.summary}</p>}
         <p className="entry-byline">
-          <time dateTime={entry.publishedAt}>
-            {formatEditorialDate(entry.publishedAt)}
-          </time>
+          {preview ? (
+            <span>Saved preview</span>
+          ) : (
+            <time dateTime={entry.publishedAt}>
+              {formatEditorialDate(entry.publishedAt)}
+            </time>
+          )}
           <span>{entry.readMinutes} min read</span>
         </p>
         {entry.tags.length > 0 && (
@@ -55,8 +83,36 @@ export function PublicEntryPage({ entry }: { entry: PublicEntry }) {
         </section>
       )}
 
-      <MarkdownContent markdown={entry.bodyMarkdown} />
-      {entry.id ? <Comments entryId={entry.id} /> : null}
+      <section
+        id="entry-content"
+        className="entry-content"
+        aria-label="Article body"
+      >
+        <MarkdownContent markdown={entry.bodyMarkdown} anchorHeadings />
+      </section>
+      {!preview && (older || newer) ? (
+        <nav className="entry-neighbors" aria-label={`More ${entry.section}`}>
+          {older ? (
+            <Link
+              className="entry-neighbor entry-neighbor-older"
+              href={`/${entry.section}/${encodeURIComponent(older.slug)}`}
+            >
+              <span className="entry-neighbor-label">Older</span>
+              <span className="entry-neighbor-title">{older.title}</span>
+            </Link>
+          ) : null}
+          {newer ? (
+            <Link
+              className="entry-neighbor entry-neighbor-newer"
+              href={`/${entry.section}/${encodeURIComponent(newer.slug)}`}
+            >
+              <span className="entry-neighbor-label">Newer</span>
+              <span className="entry-neighbor-title">{newer.title}</span>
+            </Link>
+          ) : null}
+        </nav>
+      ) : null}
+      {!preview && entry.id ? <Comments entryId={entry.id} /> : null}
     </article>
   );
 }

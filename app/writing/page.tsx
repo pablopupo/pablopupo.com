@@ -19,7 +19,7 @@ export default async function Writing() {
 
   return (
     <div className="public-index reading-shell">
-      <header className="page-header">
+      <header className="page-header section-index-header">
         <p className="eyebrow">Notes and essays</p>
         <h1>Writing</h1>
         <p>

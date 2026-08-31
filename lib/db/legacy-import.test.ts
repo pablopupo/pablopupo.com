@@ -72,30 +72,75 @@ Portable body`,
     expect(publicPost.publishedAt).toEqual(new Date("2026-07-01T00:00:00.000Z"));
   });
 
-  it("loads every tracked public source and only the public Accordo copy", () => {
+  it("loads the curated public projects in editorial order", () => {
     const content = loadLegacyContent(process.cwd());
 
     expect(content.entries).toHaveLength(2);
     expect(content.entries.every((entry) => entry.status === "draft")).toBe(true);
     expect(content.contributions).toHaveLength(24);
-    expect(content.graphNodes).toHaveLength(27);
-    expect(content.graphEdges).toHaveLength(32);
-    expect(content.projects.map((project) => project.title)).toEqual([
-      "Gradus ad Parnassum",
-      "kit-ai",
-      "llama3-medical-3b-4bit",
-      "Accordo",
-      "Nova",
-      "SubjuGator website",
+    expect(content.graphNodes).toHaveLength(10);
+    expect(content.graphEdges).toHaveLength(9);
+    expect(
+      content.projects.map(({ slug, title, sortOrder, featured }) => ({
+        slug,
+        title,
+        sortOrder,
+        featured,
+      }))
+    ).toEqual([
+      {
+        slug: "gradus-ad-parnassum",
+        title: "Gradus ad Parnassum",
+        sortOrder: 0,
+        featured: true,
+      },
+      { slug: "kit-ai", title: "Kit AI", sortOrder: 1, featured: true },
+      { slug: "nova", title: "Nova", sortOrder: 2, featured: true },
+      { slug: "accordo", title: "Accordo", sortOrder: 3, featured: false },
     ]);
 
-    const accordo = content.projects.find((project) => project.slug === "accordo");
-    expect(accordo).toMatchObject({
-      bodyMarkdown:
-        "A booking and payments marketplace for musicians. I founded it and run it. No public repo or link yet.",
-      technologies: [],
-      links: [],
-    });
+    const kitAi = content.projects.find((project) => project.slug === "kit-ai");
+    expect(kitAi?.links.map(({ kind, url }) => ({ kind, url }))).toEqual([
+      { kind: "repository", url: "https://github.com/pablopupo/kit-ai" },
+      { kind: "live", url: "https://kit-ai-smoky.vercel.app" },
+      {
+        kind: "other",
+        url: "https://huggingface.co/Pablo305/llama3-medical-3b-4bit",
+      },
+      {
+        kind: "demo",
+        url: "https://huggingface.co/spaces/Pablo305/offline-medical-assistant",
+      },
+    ]);
+
+    expect(
+      content.graphNodes
+        .filter((node) => node.kind === "project")
+        .map(({ key, label, pinned }) => ({ key, label, pinned }))
+        .sort((left, right) => left.key.localeCompare(right.key))
+    ).toEqual([
+      { key: "accordo", label: "Accordo", pinned: false },
+      {
+        key: "gradus-ad-parnassum",
+        label: "Gradus ad Parnassum",
+        pinned: true,
+      },
+      { key: "kit-ai", label: "Kit AI", pinned: true },
+      { key: "nova", label: "Nova", pinned: true },
+    ]);
+    expect(
+      content.graphNodes
+        .filter((node) => node.kind === "concept")
+        .map((node) => node.key)
+        .sort()
+    ).toEqual([
+      "emergency-medicine",
+      "music",
+      "notation",
+      "on-device-ai",
+      "payments",
+      "retrieval",
+    ]);
   });
 });
 
@@ -113,10 +158,10 @@ describe("legacy content import", () => {
     expect(second).toEqual(first);
     expect(first).toEqual({
       entries: 2,
-      projects: 6,
+      projects: 4,
       contributions: 24,
-      graphNodes: 27,
-      graphEdges: 32,
+      graphNodes: 10,
+      graphEdges: 9,
     });
 
     const counts = await client.query<{
@@ -135,11 +180,44 @@ describe("legacy content import", () => {
     );
     expect(counts.rows[0]).toEqual({
       entries: 2,
-      projects: 6,
+      projects: 4,
       contributions: 24,
-      graph_nodes: 27,
-      graph_edges: 32,
+      graph_nodes: 11,
+      graph_edges: 9,
     });
+
+    const importedProjects = await client.query<{
+      slug: string;
+      sort_order: number;
+      featured: boolean;
+    }>(`SELECT slug, sort_order, featured FROM projects ORDER BY sort_order, slug`);
+    expect(importedProjects.rows).toEqual([
+      { slug: "gradus-ad-parnassum", sort_order: 0, featured: true },
+      { slug: "kit-ai", sort_order: 1, featured: true },
+      { slug: "nova", sort_order: 2, featured: true },
+      { slug: "accordo", sort_order: 3, featured: false },
+    ]);
+
+    const importedGraphProjects = await client.query<{
+      key: string;
+      label: string;
+      pinned: boolean;
+    }>(
+      `SELECT key, label, pinned
+       FROM knowledge_graph_nodes
+       WHERE kind = 'project'
+       ORDER BY key`
+    );
+    expect(importedGraphProjects.rows).toEqual([
+      { key: "accordo", label: "Accordo", pinned: false },
+      {
+        key: "gradus-ad-parnassum",
+        label: "Gradus ad Parnassum",
+        pinned: true,
+      },
+      { key: "kit-ai", label: "Kit AI", pinned: true },
+      { key: "nova", label: "Nova", pinned: true },
+    ]);
 
     const posts = await client.query<{ slug: string; status: string; title: string }>(
       `SELECT slug, status, title FROM entries ORDER BY slug`

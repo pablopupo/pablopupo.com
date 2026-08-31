@@ -6,7 +6,7 @@ import { getPublicProjects } from "@/lib/public-content";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Work",
-  description: "Projects and open-source contributions by Pablo Pupo.",
+  description: "Applied AI projects and software work by Pablo Pupo.",
   canonical: "/work",
 });
 
@@ -20,12 +20,10 @@ export default async function Work() {
 
   return (
     <div className="public-index">
-      <header className="page-header">
+      <header className="page-header section-index-header">
         <p className="eyebrow">Software</p>
         <h1>Work</h1>
-        <p>
-          Applied AI projects, experiments, and contributions to tools I use.
-        </p>
+        <p>Applied AI projects, experiments, and systems I’ve worked on.</p>
       </header>
 
       <section aria-labelledby="projects-title">
@@ -38,12 +36,12 @@ export default async function Work() {
       <section
         className="index-section"
         id="open-source"
-        aria-labelledby="oss-title"
+        aria-labelledby="contributions-title"
       >
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Public record</p>
-            <h2 id="oss-title">Open source</h2>
+            <p className="eyebrow">Elsewhere</p>
+            <h2 id="contributions-title">Contributions</h2>
           </div>
         </div>
         <OpenSourceList contributions={contributions} />

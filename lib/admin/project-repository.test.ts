@@ -313,4 +313,89 @@ describe("admin project repository", () => {
       )
     ).resolves.toMatchObject({ bodyMarkdown: "Editable body" });
   });
+
+  it("keeps a stable graph node synchronized with project content", async () => {
+    const { client, repository } = setup();
+    const created = await repository.createDraft(
+      {
+        slug: "living-map-project",
+        kind: "project",
+        title: "Living map project",
+        organization: null,
+        summary: "The first graph summary.",
+        bodyMarkdown: "",
+        startedOn: null,
+        endedOn: null,
+        sortOrder: 0,
+        featured: false,
+        technologies: ["Retrieval"],
+        links: [],
+      },
+      createdAt
+    );
+
+    const initial = await client.query<{
+      key: string;
+      label: string;
+      kind: string;
+      href: string;
+      body: string;
+    }>(
+      `SELECT key, label, kind, href, body
+       FROM knowledge_graph_nodes
+       WHERE key = $1`,
+      [`project:${created.id}`]
+    );
+    expect(initial.rows).toEqual([
+      {
+        key: `project:${created.id}`,
+        label: "Living map project",
+        kind: "project",
+        href: "/work#living-map-project",
+        body: "The first graph summary.",
+      },
+    ]);
+
+    await repository.updateProject(
+      created.id,
+      created.updatedAt,
+      {
+        slug: "renamed-map-project",
+        kind: "project",
+        status: "published",
+        title: "Renamed map project",
+        organization: null,
+        summary: "The updated graph summary.",
+        bodyMarkdown: "",
+        startedOn: null,
+        endedOn: null,
+        publishedAt: new Date("2026-07-22T13:00:00Z"),
+        sortOrder: 0,
+        featured: false,
+        technologies: ["Retrieval"],
+        links: [],
+      },
+      new Date("2026-07-22T13:00:00Z")
+    );
+
+    const updated = await client.query<{
+      key: string;
+      label: string;
+      href: string;
+      body: string;
+    }>(
+      `SELECT key, label, href, body
+       FROM knowledge_graph_nodes
+       WHERE key = $1`,
+      [`project:${created.id}`]
+    );
+    expect(updated.rows).toEqual([
+      {
+        key: `project:${created.id}`,
+        label: "Renamed map project",
+        href: "/work#renamed-map-project",
+        body: "The updated graph summary.",
+      },
+    ]);
+  });
 });

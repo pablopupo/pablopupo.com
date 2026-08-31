@@ -1,9 +1,11 @@
-import { and, asc, desc, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, ne, or } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { getDatabase } from "./client";
 import {
   entries,
   entryMusicDetails,
+  knowledgeGraphEdges,
+  knowledgeGraphNodes,
   projectLinks,
   projects,
   projectTechnologies,
@@ -97,6 +99,51 @@ export function createContentRepository<TQueryResult extends PgQueryResultHKT>(
           asc(projectLinks.sortOrder),
           asc(projectLinks.label),
           asc(projectLinks.url)
+        );
+    },
+
+    async listPublicGraphNodes() {
+      return database
+        .select()
+        .from(knowledgeGraphNodes)
+        .where(
+          and(
+            eq(knowledgeGraphNodes.state, "public"),
+            ne(knowledgeGraphNodes.kind, "oss")
+          )
+        )
+        .orderBy(
+          desc(knowledgeGraphNodes.pinned),
+          asc(knowledgeGraphNodes.label),
+          asc(knowledgeGraphNodes.key)
+        );
+    },
+
+    async listPublicGraphEdges() {
+      const nodes = await database
+        .select({ id: knowledgeGraphNodes.id })
+        .from(knowledgeGraphNodes)
+        .where(
+          and(
+            eq(knowledgeGraphNodes.state, "public"),
+            ne(knowledgeGraphNodes.kind, "oss")
+          )
+        );
+      const nodeIds = nodes.map((node) => node.id);
+      if (nodeIds.length === 0) return [];
+      return database
+        .select()
+        .from(knowledgeGraphEdges)
+        .where(
+          and(
+            eq(knowledgeGraphEdges.state, "public"),
+            inArray(knowledgeGraphEdges.sourceId, nodeIds),
+            inArray(knowledgeGraphEdges.targetId, nodeIds)
+          )
+        )
+        .orderBy(
+          asc(knowledgeGraphEdges.createdAt),
+          asc(knowledgeGraphEdges.id)
         );
     },
   };

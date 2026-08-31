@@ -50,18 +50,19 @@ describe("root social preview", () => {
     );
 
     expect(html).toContain("Pablo Pupo");
-    expect(html).toContain("Software Engineer, Applied AI");
+    expect(html).toContain("AI Engineer at Handtevy");
     expect(html).toContain("Classical piano");
+    expect(html).toContain("Software");
+    expect(html).not.toContain("Open source");
     expect(html).toContain("Miami, Florida");
     expect(html).toContain("pablo-pupo-portrait.jpg");
-    expect(html).not.toContain("Handtevy");
   });
 
   it("exports a 1200 by 630 production image", async () => {
     const image = await import("./opengraph-image").catch(() => undefined);
     expect(image?.default).toBeTypeOf("function");
     expect(image).toMatchObject({
-      alt: "Pablo Pupo, Software Engineer, Applied AI and classical pianist",
+      alt: "Pablo Pupo, AI engineer and classical pianist",
       contentType: "image/png",
       revalidate: 60,
       runtime: "nodejs",
@@ -74,7 +75,7 @@ describe("root social preview", () => {
     };
     expect(response.options).toEqual({ width: 1200, height: 630 });
     const html = renderToStaticMarkup(response.element);
-    expect(html).toContain("Software Engineer, Applied AI");
+    expect(html).toContain("AI Engineer at Handtevy");
     expect(html).toContain(
       `data:image/jpeg;base64,${Buffer.from("portrait-jpeg").toString("base64")}`
     );

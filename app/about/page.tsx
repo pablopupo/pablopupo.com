@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import MarkdownContent from "@/components/markdown-content";
 import { createPageMetadata } from "@/lib/metadata";
 import { getPublicProfile } from "@/lib/public-profile";
@@ -6,7 +7,7 @@ import { getPublicProfile } from "@/lib/public-profile";
 export const metadata: Metadata = createPageMetadata({
   title: "About",
   description:
-    "About Pablo Pupo, a software engineer focused on applied AI and a classical pianist.",
+    "About Pablo Pupo, a University of Florida computer science student, AI engineer at Handtevy, and classical pianist.",
   canonical: "/about",
 });
 
@@ -65,7 +66,7 @@ export default async function About() {
       <section aria-labelledby="contact-title">
         <h2 id="contact-title">Contact</h2>
         <p className="profile-links">
-          <a href="/resume">Resume</a>
+          <Link href="/resume">Resume</Link>
           {profile.contactEmail && (
             <a href={`mailto:${profile.contactEmail}`}>Email</a>
           )}

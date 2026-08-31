@@ -34,6 +34,7 @@ type LegacyProject = {
   bodyMarkdown: string;
   publishedAt: Date;
   sortOrder: number;
+  featured: boolean;
   technologies: string[];
   links: Array<{
     kind: "repository" | "live" | "demo" | "writeup" | "other";
@@ -59,6 +60,7 @@ type LegacyGraphNode = {
   kind: "concept" | "project" | "writing" | "music" | "oss";
   href: string | null;
   body: string;
+  pinned: boolean;
   tags: string[];
 };
 
@@ -89,6 +91,7 @@ const legacyProjects: LegacyProject[] = [
       "RAG over musical notation. It parses scores, annotates them the way a musician would, and answers theory questions with measure references. First corpus is the Chopin Etudes. Early days; the long game is notation-native generation grounded in retrieval.",
     publishedAt: projectPublishedAt,
     sortOrder: 0,
+    featured: true,
     technologies: [],
     links: [
       {
@@ -103,11 +106,12 @@ const legacyProjects: LegacyProject[] = [
     slug: "kit-ai",
     kind: "project",
     status: "published",
-    title: "kit-ai",
+    title: "Kit AI",
     bodyMarkdown:
-      "Offline-first emergency first-aid PWA, built with a hackathon team. My parts were the IndexedDB retrieval layer, the online/offline TTS fallback, and a fine-tuned Llama 3 medical model that is not yet wired into the app.",
+      "An offline-first emergency first-aid PWA built with a hackathon team. I worked on its IndexedDB retrieval layer, online/offline text-to-speech fallback, and a related fine-tuned Llama 3.2 3B model. The model remains an experiment and is not yet wired into the app.",
     publishedAt: projectPublishedAt,
     sortOrder: 1,
+    featured: true,
     technologies: ["IndexedDB", "TTS", "Llama 3"],
     links: [
       {
@@ -122,44 +126,19 @@ const legacyProjects: LegacyProject[] = [
         url: "https://kit-ai-smoky.vercel.app",
         sortOrder: 1,
       },
-    ],
-  },
-  {
-    slug: "llama3-medical-3b-4bit",
-    kind: "project",
-    status: "published",
-    title: "llama3-medical-3b-4bit",
-    bodyMarkdown:
-      "Llama 3.2 3B fine-tuned for first-aid question answering and quantized to 4 bits. There is a demo Space if you want to talk to it.",
-    publishedAt: projectPublishedAt,
-    sortOrder: 2,
-    technologies: ["Llama 3.2", "4-bit quantization"],
-    links: [
       {
         kind: "other",
-        label: "hugging face",
+        label: "model",
         url: "https://huggingface.co/Pablo305/llama3-medical-3b-4bit",
-        sortOrder: 0,
+        sortOrder: 2,
       },
       {
         kind: "demo",
         label: "demo",
         url: "https://huggingface.co/spaces/Pablo305/offline-medical-assistant",
-        sortOrder: 1,
+        sortOrder: 3,
       },
     ],
-  },
-  {
-    slug: "accordo",
-    kind: "project",
-    status: "published",
-    title: "Accordo",
-    bodyMarkdown:
-      "A booking and payments marketplace for musicians. I founded it and run it. No public repo or link yet.",
-    publishedAt: projectPublishedAt,
-    sortOrder: 3,
-    technologies: [],
-    links: [],
   },
   {
     slug: "nova",
@@ -167,9 +146,10 @@ const legacyProjects: LegacyProject[] = [
     status: "published",
     title: "Nova",
     bodyMarkdown:
-      "Solana Pay invoicing platform. Won Best Use of Solana at SwampHacks.",
+      "A Solana Pay invoicing app with QR payments, transaction tracking, and dashboards. It won Best Use of Solana at SwampHacks.",
     publishedAt: projectPublishedAt,
-    sortOrder: 4,
+    sortOrder: 2,
+    featured: true,
     technologies: ["Solana Pay"],
     links: [
       {
@@ -181,23 +161,17 @@ const legacyProjects: LegacyProject[] = [
     ],
   },
   {
-    slug: "subjugator-website",
+    slug: "accordo",
     kind: "project",
     status: "published",
-    title: "SubjuGator website",
+    title: "Accordo",
     bodyMarkdown:
-      "Three.js site for UF’s RoboSub team, recognized as the top RoboSub website. The team placed top 15 at RoboSub 2025.",
+      "A booking and payments marketplace I founded for musicians, covering bookings, contracts, and payment workflows.",
     publishedAt: projectPublishedAt,
-    sortOrder: 5,
-    technologies: ["Three.js"],
-    links: [
-      {
-        kind: "repository",
-        label: "github",
-        url: "https://github.com/pablopupo/subjugator.org",
-        sortOrder: 0,
-      },
-    ],
+    sortOrder: 3,
+    featured: false,
+    technologies: [],
+    links: [],
   },
 ];
 
@@ -258,13 +232,19 @@ function loadGraph(root: string): {
   const graph = JSON.parse(
     fs.readFileSync(path.join(root, "data", "graph.json"), "utf8")
   ) as {
-    concepts: Array<{ id: string; label: string; text: string }>;
+    concepts: Array<{
+      id: string;
+      label: string;
+      text: string;
+      pinned?: boolean;
+    }>;
     nodes: Array<{
       id: string;
       label: string;
       type: LegacyGraphNode["kind"];
       href: string | null;
       text: string;
+      pinned?: boolean;
       tags: string[];
     }>;
   };
@@ -274,6 +254,7 @@ function loadGraph(root: string): {
     kind: "concept",
     href: null,
     body: concept.text,
+    pinned: concept.pinned ?? false,
     tags: [],
   }));
   const nodes = graph.nodes.map((node): LegacyGraphNode => ({
@@ -282,6 +263,7 @@ function loadGraph(root: string): {
     kind: node.type,
     href: node.href,
     body: node.text,
+    pinned: node.pinned ?? false,
     tags: node.tags,
   }));
   const graphEdges = nodes.flatMap((node) =>
@@ -343,6 +325,7 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
         bodyMarkdown: project.bodyMarkdown,
         publishedAt: project.publishedAt,
         sortOrder: project.sortOrder,
+        featured: project.featured,
       })
       .onConflictDoUpdate({
         target: projects.slug,
@@ -353,6 +336,7 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
           bodyMarkdown: project.bodyMarkdown,
           publishedAt: project.publishedAt,
           sortOrder: project.sortOrder,
+          featured: project.featured,
         },
       })
       .returning({ id: projects.id });
@@ -414,6 +398,7 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
           kind: node.kind,
           href: node.href,
           body: node.body,
+          pinned: node.pinned,
           tags: node.tags,
         },
       })

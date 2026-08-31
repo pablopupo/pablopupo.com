@@ -1,5 +1,9 @@
+// @vitest-environment jsdom
+
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkEditor, {
   applyProjectPublicationAction,
   parseTechnologyInput,
@@ -8,6 +12,36 @@ import WorkEditor, {
   reconcileSavedProject,
   type EditorProject,
 } from "./work-editor";
+import { preparePreviewWindow } from "@/lib/admin/preview-window";
+
+vi.mock("next/dynamic", () => ({
+  default: (
+    _loader: unknown,
+    options: { loading: () => React.ReactNode }
+  ) => options.loading,
+}));
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
+
+let root: Root | null = null;
+let container: HTMLDivElement | null = null;
+
+afterEach(() => {
+  if (root) act(() => root?.unmount());
+  container?.remove();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  root = null;
+  container = null;
+});
+
+function jsonResponse(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
 
 const project: EditorProject = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -208,6 +242,125 @@ describe("Work editor payloads", () => {
       applyProjectPublicationAction(project, "archive", "", now)
     ).toMatchObject({ project: { status: "archived" } });
   });
+
+  it("reserves a tab before saving and opens the saved project preview", async () => {
+    const module = await import("./work-editor");
+    const replace = vi.fn();
+    const close = vi.fn();
+    const browser = {
+      open: vi.fn().mockReturnValue({
+        location: { replace },
+        close,
+        opener: null,
+      }),
+      location: { assign: vi.fn() },
+    };
+    let finishSave: ((value: {
+      project: EditorProject;
+      changedDuringRequest: boolean;
+    }) => void) | undefined;
+    const save = vi.fn(
+      () =>
+        new Promise<{
+          project: EditorProject;
+          changedDuringRequest: boolean;
+        }>((resolve) => {
+          finishSave = resolve;
+        })
+    );
+
+    expect(module.saveAndPreviewProject).toBeTypeOf("function");
+    const result = module.saveAndPreviewProject(
+      save,
+      () => preparePreviewWindow(browser)
+    );
+
+    expect(browser.open).toHaveBeenCalledWith("about:blank", "_blank");
+    expect(save).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+
+    finishSave?.({ project, changedDuringRequest: false });
+
+    await expect(result).resolves.toBe(true);
+    expect(replace).toHaveBeenCalledWith(
+      `/admin/preview/work/${project.id}`
+    );
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("cancels the preview when newer local edits remain after saving", async () => {
+    const module = await import("./work-editor");
+    const replace = vi.fn();
+    const close = vi.fn();
+    const browser = {
+      open: vi.fn().mockReturnValue({
+        location: { replace },
+        close,
+        opener: null,
+      }),
+      location: { assign: vi.fn() },
+    };
+
+    await expect(
+      module.saveAndPreviewProject(
+        async () => ({ project, changedDuringRequest: true }),
+        () => preparePreviewWindow(browser)
+      )
+    ).resolves.toBe(false);
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("cancels the reserved tab when the save fails", async () => {
+    const module = await import("./work-editor");
+    const replace = vi.fn();
+    const close = vi.fn();
+    const browser = {
+      open: vi.fn().mockReturnValue({
+        location: { replace },
+        close,
+        opener: null,
+      }),
+      location: { assign: vi.fn() },
+    };
+
+    await expect(
+      module.saveAndPreviewProject(
+        async () => null,
+        () => preparePreviewWindow(browser)
+      )
+    ).resolves.toBe(false);
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("cancels the reserved tab when the save rejects unexpectedly", async () => {
+    const module = await import("./work-editor");
+    const replace = vi.fn();
+    const close = vi.fn();
+    const browser = {
+      open: vi.fn().mockReturnValue({
+        location: { replace },
+        close,
+        opener: null,
+      }),
+      location: { assign: vi.fn() },
+    };
+
+    await expect(
+      module.saveAndPreviewProject(
+        async () => {
+          throw new Error("save exploded");
+        },
+        () => preparePreviewWindow(browser)
+      )
+    ).resolves.toBe(false);
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+  });
 });
 
 describe("Work editor UI", () => {
@@ -229,6 +382,7 @@ describe("Work editor UI", () => {
       "Project links",
       "Add link",
       "Create draft",
+      "Save &amp; Preview",
       "Publish now",
       "Schedule",
       "Unpublish",
@@ -239,5 +393,107 @@ describe("Work editor UI", () => {
     ]) {
       expect(html).toContain(label);
     }
+  });
+
+  it("reserves and cancels a preview tab through the editor action", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ projects: [] })));
+    const close = vi.fn();
+    const open = vi.spyOn(window, "open").mockReturnValue({
+      location: { replace: vi.fn() },
+      close,
+      opener: null,
+    } as unknown as Window);
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<WorkEditor />);
+      await Promise.resolve();
+    });
+    const previewButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Save & Preview"
+    );
+
+    act(() => previewButton?.click());
+
+    expect(open).toHaveBeenCalledWith("about:blank", "_blank");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(close).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("Title and slug are required");
+  });
+
+  it("opens the saved preview without waiting for the project list refresh", async () => {
+    let listRequests = 0;
+    let finishRefresh: ((response: Response) => void) | undefined;
+    const pendingRefresh = new Promise<Response>((resolve) => {
+      finishRefresh = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/admin/projects") {
+          listRequests += 1;
+          return listRequests === 1
+            ? Promise.resolve(jsonResponse({ projects: [project] }))
+            : pendingRefresh;
+        }
+        if (
+          url === `/api/admin/projects/${project.id}` &&
+          init?.method === "PATCH"
+        ) {
+          return Promise.resolve(jsonResponse({ project }));
+        }
+        if (url === `/api/admin/projects/${project.id}` && !init?.method) {
+          return Promise.resolve(jsonResponse({ project }));
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      })
+    );
+    const replace = vi.fn();
+    vi.spyOn(window, "open").mockReturnValue({
+      location: { replace },
+      close: vi.fn(),
+      opener: null,
+    } as unknown as Window);
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<WorkEditor />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const projectButton = [
+      ...container.querySelectorAll<HTMLButtonElement>("aside button"),
+    ].find((button) => button.textContent?.includes(project.title));
+    await act(async () => {
+      projectButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const previewButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Save & Preview"
+    );
+
+    await act(async () => {
+      previewButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const openedBeforeRefresh = replace.mock.calls.length > 0;
+    expect(listRequests).toBe(2);
+
+    await act(async () => {
+      finishRefresh?.(jsonResponse({ projects: [project] }));
+      await pendingRefresh;
+      await Promise.resolve();
+    });
+
+    expect(openedBeforeRefresh).toBe(true);
+    expect(replace).toHaveBeenCalledWith(`/admin/preview/work/${project.id}`);
   });
 });

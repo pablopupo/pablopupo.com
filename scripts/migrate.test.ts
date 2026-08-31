@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -27,8 +30,17 @@ vi.mock("drizzle-orm/neon-http/migrator", () => ({
 }));
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
+const originalWorkingDirectory = process.cwd();
+let temporaryDirectory = "";
+
+async function executeMigration() {
+  const module = await import("./migrate");
+  return module.migration;
+}
 
 beforeEach(() => {
+  temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "pablopupo-migrate-"));
+  process.chdir(temporaryDirectory);
   vi.clearAllMocks();
   delete process.env.DATABASE_URL;
   mocks.Pool.mockImplementation(function Pool() {
@@ -41,6 +53,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  process.chdir(originalWorkingDirectory);
+  fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
   vi.resetModules();
@@ -48,7 +62,7 @@ afterEach(() => {
 
 describe("database migration script", () => {
   it("rejects missing configuration before constructing a Pool", async () => {
-    await expect(import("./migrate")).rejects.toThrowError(
+    await expect(executeMigration()).rejects.toThrowError(
       "DATABASE_URL is required before running database migrations"
     );
 
@@ -61,7 +75,7 @@ describe("database migration script", () => {
     process.env.DATABASE_URL =
       "postgres://user:password@example.com/database";
 
-    await import("./migrate");
+    await executeMigration();
 
     expect(mocks.Pool).toHaveBeenCalledWith({
       connectionString: "postgres://user:password@example.com/database",
@@ -72,6 +86,22 @@ describe("database migration script", () => {
     });
     expect(mocks.pool.end).toHaveBeenCalledTimes(1);
     expect(mocks.oldMigrate).not.toHaveBeenCalled();
+  });
+
+  it("loads DATABASE_URL from .env.local before constructing a Pool", async () => {
+    fs.writeFileSync(
+      path.join(temporaryDirectory, ".env.local"),
+      "DATABASE_URL=postgres://local:user@example.com/database\n"
+    );
+
+    await executeMigration();
+
+    expect(mocks.Pool).toHaveBeenCalledWith({
+      connectionString: "postgres://local:user@example.com/database",
+    });
+    expect(mocks.migrate).toHaveBeenCalledWith(mocks.database, {
+      migrationsFolder: "drizzle",
+    });
   });
 
   it("awaits Pool cleanup when migration execution fails", async () => {
@@ -85,7 +115,7 @@ describe("database migration script", () => {
       closedBeforeRejection = true;
     });
 
-    await expect(import("./migrate")).rejects.toBe(failure);
+    await expect(executeMigration()).rejects.toBe(failure);
 
     expect(closedBeforeRejection).toBe(true);
     expect(mocks.pool.end).toHaveBeenCalledTimes(1);

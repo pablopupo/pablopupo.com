@@ -126,6 +126,25 @@ describe("admin entry server runner", () => {
     expect(mocks.pool.end).toHaveBeenCalledTimes(1);
   });
 
+  it("constructs graph handlers with a request-scoped database", async () => {
+    configureEnvironment();
+    const server = await import("./server");
+    const operation = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+
+    expect(server.withAdminGraphHandlers).toBeTypeOf("function");
+    const response = await server.withAdminGraphHandlers(operation);
+
+    expect(response.status).toBe(200);
+    expect(operation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        list: expect.any(Function),
+        createConcept: expect.any(Function),
+        mutate: expect.any(Function),
+      })
+    );
+    expect(mocks.pool.end).toHaveBeenCalledTimes(1);
+  });
+
   it("constructs media handlers with Blob dependencies and closes the pool", async () => {
     configureEnvironment();
     const server = await import("./server");

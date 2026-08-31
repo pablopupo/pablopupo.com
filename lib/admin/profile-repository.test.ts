@@ -142,23 +142,23 @@ describe.sequential("profile migration seed", () => {
     expect(settings.rows).toEqual([
       {
         site_title: "Pablo Pupo",
-        headline: "Software Engineer, Applied AI",
+        headline: "AI Engineer at Handtevy",
         location: "Miami, Florida",
         graduation_on: "2026-12-01",
         intro_markdown:
-          "I’m a software engineer focused on applied AI, open source, and reliable systems. I’m also a classical pianist.",
+          "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
         about_markdown:
-          "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I contribute to open source and write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
+          "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
         contact_email: "pablofpupo23@gmail.com",
         github_url: "https://github.com/pablopupo",
         linkedin_url: "https://linkedin.com/in/pablopupo",
         youtube_url: null,
         avatar_media_id: portraitId,
         resume_media_id: resumeId,
-        version: 1,
+        version: 3,
       },
     ]);
-    expect(JSON.stringify(settings.rows)).not.toContain("Handtevy");
+    expect(JSON.stringify(settings.rows)).not.toContain("200,000");
   });
 });
 

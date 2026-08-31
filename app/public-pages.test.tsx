@@ -17,7 +17,8 @@ vi.mock("@/lib/public-profile", () => ({
   DEFAULT_PUBLIC_PROFILE: { siteTitle: "Pablo Pupo" },
 }));
 
-vi.mock("@/lib/public-content", () => ({
+vi.mock("@/lib/public-content", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/public-content")>()),
   getPublicEntries: mocks.getPublicEntries,
   getPublicEntry: mocks.getPublicEntry,
   getPublicProjects: mocks.getPublicProjects,
@@ -61,11 +62,13 @@ vi.mock("next/navigation", () => ({
 
 const profile = {
   siteTitle: "Pablo Pupo",
-  headline: "Software Engineer, Applied AI",
+  headline: "AI Engineer at Handtevy",
   location: "Miami, Florida",
   graduationOn: "2026-12-01",
-  introMarkdown: "I build applied AI systems and play classical piano.",
-  aboutMarkdown: "I study computer science and build applied AI systems.",
+  introMarkdown:
+    "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
+  aboutMarkdown:
+    "I study computer science and build applied AI systems. I write technical notes about what I learn.",
   contactEmail: "pablofpupo23@gmail.com",
   githubUrl: "https://github.com/pablopupo",
   linkedinUrl: "https://linkedin.com/in/pablopupo",
@@ -151,38 +154,62 @@ beforeEach(() => {
 });
 
 describe("public pages", () => {
-  it("prioritizes featured work without dropping the remaining slots", async () => {
+  it("selects Gradus, Kit AI, and Nova for homepage work", async () => {
     const { selectSelectedProjects } = await import("./page");
     const projects = [
-      { slug: "first", featured: false },
-      { slug: "featured", featured: true },
-      { slug: "third", featured: false },
-      { slug: "fourth", featured: false },
+      { slug: "gradus-ad-parnassum", featured: true },
+      { slug: "kit-ai", featured: true },
+      { slug: "nova", featured: true },
+      { slug: "accordo", featured: false },
     ];
 
     expect(
       selectSelectedProjects(projects).map((candidate) => candidate.slug)
-    ).toEqual(["featured", "first", "third"]);
+    ).toEqual(["gradus-ad-parnassum", "kit-ai", "nova"]);
   });
 
-  it("leads the homepage with the approved profile and places the graph second", async () => {
+  it("leads with an editorial introduction and folds the graph into it", async () => {
     const { default: Home } = await import("./page");
 
     const html = renderToStaticMarkup(await Home());
 
     expect(html).toContain('src="/media/pablo-pupo-portrait.jpg"');
-    expect(html).toContain("Software Engineer, Applied AI");
-    expect(html).toContain("Miami, Florida");
-    expect(html).toContain("December 2026");
+    expect(html).toContain('class="visually-hidden"');
+    expect(html).toContain("Pablo Pupo</h1>");
+    expect(html).toContain(
+      "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast."
+    );
+    expect(html).not.toContain("Building Software, Playing Piano");
+    expect(html).not.toContain("open-source work");
+    expect(html).not.toContain("Projects, notes, and performances.");
+    expect(html).not.toContain("Hi, I’m Pablo.");
+    expect(html).not.toContain("Applied AI, reliable software, and classical piano.");
+    expect(html).not.toContain('class="hero-focus"');
+    expect(html).not.toContain("Software Engineer, Applied AI");
+    expect(html).not.toContain("Miami, Florida");
+    expect(html).not.toContain("December 2026");
     expect(html).toContain('href="/resume"');
+    expect(html).toContain('aria-label="Résumé"');
     expect(html).toContain('href="mailto:pablofpupo23@gmail.com"');
-    expect(html).not.toContain("Handtevy");
+    expect(html).toContain('aria-label="Email"');
+    expect(html).toContain('aria-label="GitHub"');
+    expect(html).toContain('aria-label="LinkedIn"');
+    expect(html).toContain('aria-label="RSS"');
+    expect(html).toContain('class="profile-icon-links"');
+    expect(html).toMatch(
+      /<a (?=[^>]*href="\/about")(?=[^>]*class="portrait-link")[^>]*><div class="portrait-frame">/
+    );
+    expect(html).toContain("Handtevy");
+    expect(html).not.toContain("200,000");
     expect(html.indexOf("Knowledge graph canvas")).toBeGreaterThan(
-      html.indexOf("Software Engineer, Applied AI")
+      html.indexOf(
+        "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast."
+      )
     );
     expect(html.indexOf("Knowledge graph canvas")).toBeLessThan(
       html.indexOf("Selected work")
     );
+    expect(html).not.toContain("Knowledge graph</h2>");
     expect(html).toContain("Database project");
     expect(html).toContain("Experience");
     expect(html).toContain("Example AI Lab");
@@ -192,10 +219,12 @@ describe("public pages", () => {
     expect(html).toContain("project:database-project");
     expect(html).toContain("entry:writing:database-writing");
     expect(html).toContain("entry:music:database-performance");
-    expect(html).toContain("docling #3721");
+    expect(html).not.toContain("docling #3721");
+    expect(html).not.toContain("All contributions");
+    expect(mocks.getLiveContributions).not.toHaveBeenCalled();
   });
 
-  it("combines public projects and open-source work on /work", async () => {
+  it("keeps contributions as quiet evidence at the bottom of /work", async () => {
     const module = await import("./work/page").catch(() => undefined);
     expect(module?.default).toBeTypeOf("function");
 
@@ -203,8 +232,15 @@ describe("public pages", () => {
 
     expect(html).toContain("Database project");
     expect(html).toContain("TypeScript · Retrieval");
-    expect(html).toContain("Open source");
+    expect(html).toContain("Elsewhere");
+    expect(html).toContain('<h2 id="contributions-title">Contributions</h2>');
     expect(html).toContain("docling #3721");
+    expect(html.indexOf("Database project")).toBeLessThan(
+      html.indexOf("Elsewhere")
+    );
+    expect(html).not.toContain(
+      "Applied AI projects, experiments, and contributions to tools I use."
+    );
   });
 
   it("keeps writing and music in their own editorial indexes", async () => {
@@ -224,6 +260,31 @@ describe("public pages", () => {
     expect(musicHtml).toContain(
       'src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"'
     );
+    expect(musicHtml).toContain(musicEntry.summary);
+    expect(musicHtml).not.toContain(
+      musicEntry.performance.notesMarkdown
+    );
+  });
+
+  it("anchors the Work, Writing, and Music introductions to one reading measure", async () => {
+    const [{ default: Work }, { default: Writing }, { default: Music }] =
+      await Promise.all([
+        import("./work/page"),
+        import("./writing/page"),
+        import("./music/page"),
+      ]);
+
+    const [workHtml, writingHtml, musicHtml] = await Promise.all([
+      Work().then(renderToStaticMarkup),
+      Writing().then(renderToStaticMarkup),
+      Music().then(renderToStaticMarkup),
+    ]);
+
+    for (const html of [workHtml, writingHtml, musicHtml]) {
+      expect(html).toContain(
+        'class="page-header section-index-header"'
+      );
+    }
   });
 
   it("presents applied AI first while being honest about AI systems learning", async () => {
@@ -238,7 +299,6 @@ describe("public pages", () => {
     expect(html).toContain("Miami, Florida");
     expect(html).toContain("December 2026");
     expect(html).toContain('href="/resume"');
-    expect(html).not.toContain("Handtevy");
   });
 
   it("renders a published database entry with safe Markdown", async () => {
@@ -254,6 +314,7 @@ describe("public pages", () => {
     });
 
     expect(mocks.getPublicEntry).toHaveBeenCalledWith(writingEntry.slug);
+    expect(mocks.getPublicEntries).toHaveBeenCalled();
     expect(html).toContain("Database writing");
     expect(html).toContain("The published body.");
     expect(html).toContain("evaluation · retrieval");
@@ -291,6 +352,7 @@ describe("public pages", () => {
     expect(html).toContain(
       'src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"'
     );
+    expect(html).toContain(musicEntry.performance.notesMarkdown);
     await expect(
       generateMetadata({
         params: Promise.resolve({ slug: musicEntry.slug }),
@@ -300,6 +362,42 @@ describe("public pages", () => {
       openGraph: { type: "article", url: `/music/${musicEntry.slug}` },
       twitter: { title: musicEntry.title },
     });
+  });
+
+  it("passes immediate same-section neighbors to writing details", async () => {
+    const newer = {
+      ...writingEntry,
+      id: "newer-writing-id",
+      slug: "newer-writing",
+      title: "Newer writing",
+      publishedAt: "2026-07-22T12:00:00.000Z",
+    };
+    const older = {
+      ...writingEntry,
+      id: "older-writing-id",
+      slug: "older-writing",
+      title: "Older writing",
+      publishedAt: "2026-07-18T12:00:00.000Z",
+    };
+    mocks.getPublicEntries.mockResolvedValue([
+      older,
+      musicEntry,
+      newer,
+      writingEntry,
+    ]);
+    const { default: WritingEntryPage } = await import("./writing/[slug]/page");
+
+    const html = renderToStaticMarkup(
+      await WritingEntryPage({
+        params: Promise.resolve({ slug: writingEntry.slug }),
+      })
+    );
+
+    expect(html).toContain('href="/writing/newer-writing"');
+    expect(html).toContain("Newer writing");
+    expect(html).toContain('href="/writing/older-writing"');
+    expect(html).toContain("Older writing");
+    expect(html).not.toContain('href="/music/database-performance"');
   });
 
   it("rejects entries requested through the wrong section route", async () => {

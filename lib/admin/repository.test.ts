@@ -854,4 +854,84 @@ describe("admin entry repository", () => {
     );
     expect(owned.rows[0]).toEqual({ entries: 0, revisions: 0 });
   });
+
+  it("keeps a stable graph node synchronized with entry content", async () => {
+    const { client, repository } = setup();
+    const created = await repository.createDraft(
+      {
+        slug: "living-map-note",
+        title: "Living map note",
+        kind: "note",
+        section: "writing",
+        summary: "The first note summary.",
+      },
+      now
+    );
+
+    const initial = await client.query<{
+      key: string;
+      label: string;
+      kind: string;
+      href: string;
+      body: string;
+    }>(
+      `SELECT key, label, kind, href, body
+       FROM knowledge_graph_nodes
+       WHERE key = $1`,
+      [`entry:${created.id}`]
+    );
+    expect(initial.rows).toEqual([
+      {
+        key: `entry:${created.id}`,
+        label: "Living map note",
+        kind: "writing",
+        href: "/writing/living-map-note",
+        body: "The first note summary.",
+      },
+    ]);
+
+    await repository.updateEntry(
+      created.id,
+      created.version,
+      {
+        slug: "living-map-performance",
+        kind: "performance",
+        section: "music",
+        tags: ["Piano"],
+        status: "published",
+        title: "Living map performance",
+        summary: "The updated performance summary.",
+        bodyMarkdown: "",
+        publishedAt: new Date("2026-07-22T14:00:00Z"),
+        performance: {
+          workTitle: "Etude",
+          composer: "Chopin",
+          youtubeUrl: "https://youtu.be/example",
+        },
+      },
+      new Date("2026-07-22T14:00:00Z")
+    );
+
+    const updated = await client.query<{
+      key: string;
+      label: string;
+      kind: string;
+      href: string;
+      body: string;
+    }>(
+      `SELECT key, label, kind, href, body
+       FROM knowledge_graph_nodes
+       WHERE key = $1`,
+      [`entry:${created.id}`]
+    );
+    expect(updated.rows).toEqual([
+      {
+        key: `entry:${created.id}`,
+        label: "Living map performance",
+        kind: "music",
+        href: "/music/living-map-performance",
+        body: "The updated performance summary.",
+      },
+    ]);
+  });
 });

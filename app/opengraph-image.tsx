@@ -9,7 +9,7 @@ import {
 import { SocialCard } from "./social-card";
 
 export const alt =
-  "Pablo Pupo, Software Engineer, Applied AI and classical pianist";
+  "Pablo Pupo, AI engineer and classical pianist";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const runtime = "nodejs";

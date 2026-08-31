@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import {
+  knowledgeGraphNodes,
   projectLinks,
   projects,
   projectTechnologies,
 } from "../db/schema";
+import { projectGraphSnapshot } from "../db/graph-sync";
 import type * as schema from "../db/schema";
 import type { ProjectMutation } from "../db/validation";
 
@@ -106,6 +108,21 @@ export function createAdminProjectRepository<
             updatedAt: now,
           })
           .returning();
+        const graphNode = projectGraphSnapshot(inserted[0]!);
+        await transaction
+          .insert(knowledgeGraphNodes)
+          .values({ ...graphNode, createdAt: now, updatedAt: now })
+          .onConflictDoUpdate({
+            target: knowledgeGraphNodes.projectId,
+            set: {
+              label: graphNode.label,
+              kind: graphNode.kind,
+              href: graphNode.href,
+              body: graphNode.body,
+              origin: graphNode.origin,
+              updatedAt: now,
+            },
+          });
         if (input.technologies.length > 0) {
           await transaction.insert(projectTechnologies).values(
             input.technologies.map((name, sortOrder) => ({
@@ -180,6 +197,21 @@ export function createAdminProjectRepository<
         if (!updated[0]) {
           throw new ProjectConflictError("Project changed in another session");
         }
+        const graphNode = projectGraphSnapshot(updated[0]);
+        await transaction
+          .insert(knowledgeGraphNodes)
+          .values({ ...graphNode, createdAt: now, updatedAt: now })
+          .onConflictDoUpdate({
+            target: knowledgeGraphNodes.projectId,
+            set: {
+              label: graphNode.label,
+              kind: graphNode.kind,
+              href: graphNode.href,
+              body: graphNode.body,
+              origin: graphNode.origin,
+              updatedAt: now,
+            },
+          });
         await transaction
           .delete(projectTechnologies)
           .where(eq(projectTechnologies.projectId, id));

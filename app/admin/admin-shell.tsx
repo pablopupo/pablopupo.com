@@ -7,6 +7,7 @@ import type { AdminRouteState } from "./admin-route";
 type AdminTab =
   | "entries"
   | "work"
+  | "graph"
   | "comments"
   | "analytics"
   | "profile"
@@ -15,6 +16,7 @@ type AdminTab =
 const tabs = [
   { id: "entries", href: "/admin", label: "Entries" },
   { id: "work", href: "/admin/work", label: "Work" },
+  { id: "graph", href: "/admin/graph", label: "Graph" },
   { id: "comments", href: "/admin/comments", label: "Comments" },
   { id: "analytics", href: "/admin/analytics", label: "Analytics" },
   { id: "profile", href: "/admin/profile", label: "Profile" },

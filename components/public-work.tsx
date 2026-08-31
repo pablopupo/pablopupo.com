@@ -107,7 +107,7 @@ export function OpenSourceList({
   const visible = limit ? contributions.slice(0, limit) : contributions;
 
   if (visible.length === 0) {
-    return <p className="empty-state">Open-source work will appear here.</p>;
+    return <p className="empty-state">Contributions will appear here.</p>;
   }
 
   return (

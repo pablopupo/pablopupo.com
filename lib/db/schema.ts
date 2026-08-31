@@ -45,6 +45,12 @@ export const graphNodeKind = pgEnum("graph_node_kind", [
   "oss",
 ]);
 export const graphEdgeKind = pgEnum("graph_edge_kind", ["tag", "link", "semantic"]);
+export const graphOrigin = pgEnum("graph_origin", ["automatic", "manual"]);
+export const graphState = pgEnum("graph_state", [
+  "suggested",
+  "public",
+  "hidden",
+]);
 export const mediaPurpose = pgEnum("media_purpose", [
   "profile",
   "resume",
@@ -406,16 +412,36 @@ export const knowledgeGraphNodes = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     key: text("key").notNull(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    entryId: uuid("entry_id").references(() => entries.id, {
+      onDelete: "cascade",
+    }),
     label: text("label").notNull(),
+    labelOverride: text("label_override"),
     kind: graphNodeKind("kind").notNull(),
     href: text("href"),
     body: text("body").default("").notNull(),
+    summaryOverride: text("summary_override"),
     tags: text("tags").array().default(sql`ARRAY[]::text[]`).notNull(),
+    origin: graphOrigin("origin").default("manual").notNull(),
+    state: graphState("state").default("public").notNull(),
+    pinned: boolean("pinned").default(false).notNull(),
+    version: integer("version").default(1).notNull(),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("knowledge_graph_nodes_key_unique").on(table.key),
+    uniqueIndex("knowledge_graph_nodes_project_unique").on(table.projectId),
+    uniqueIndex("knowledge_graph_nodes_entry_unique").on(table.entryId),
     index("knowledge_graph_nodes_kind_idx").on(table.kind),
+    index("knowledge_graph_nodes_state_idx").on(table.state),
+    check(
+      "knowledge_graph_nodes_single_source_check",
+      sql`num_nonnulls(${table.projectId}, ${table.entryId}) <= 1`
+    ),
+    check("knowledge_graph_nodes_version_positive_check", sql`${table.version} > 0`),
   ]
 );
 
@@ -432,7 +458,11 @@ export const knowledgeGraphEdges = pgTable(
     kind: graphEdgeKind("kind").notNull(),
     weight: doublePrecision("weight"),
     terms: text("terms").array().default(sql`ARRAY[]::text[]`).notNull(),
+    origin: graphOrigin("origin").default("manual").notNull(),
+    state: graphState("state").default("public").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    version: integer("version").default(1).notNull(),
   },
   (table) => [
     uniqueIndex("knowledge_graph_edges_pair_kind_unique").on(
@@ -442,7 +472,9 @@ export const knowledgeGraphEdges = pgTable(
     ),
     index("knowledge_graph_edges_source_idx").on(table.sourceId),
     index("knowledge_graph_edges_target_idx").on(table.targetId),
+    index("knowledge_graph_edges_state_idx").on(table.state),
     check("knowledge_graph_edges_distinct_nodes_check", sql`${table.sourceId} <> ${table.targetId}`),
+    check("knowledge_graph_edges_version_positive_check", sql`${table.version} > 0`),
   ]
 );
 

@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { NamedViewTransition } from "./view-transition";
+
 export type PublicEntryListItem = {
   slug: string;
   kind: "note" | "essay" | "performance";
@@ -42,21 +45,29 @@ export function PublicEntryList({
       {entries.map((entry) => (
         <li key={entry.slug}>
           <article>
-            <div className="entry-copy">
-              <h2>
-                <a href={`/${entry.section}/${entry.slug}`}>{entry.title}</a>
-              </h2>
-              {entry.summary && <p>{entry.summary}</p>}
-            </div>
-            <div className="entry-meta">
-              <span>
-                <time dateTime={entry.publishedAt}>
-                  {formatEditorialDate(entry.publishedAt)}
-                </time>
-                {` · ${entry.readMinutes} min read`}
-              </span>
-              {entry.tags.length > 0 && <span>{entry.tags.join(" · ")}</span>}
-            </div>
+            <h2>
+              <NamedViewTransition
+                name={`entry-${entry.section}-${entry.slug}`}
+              >
+                <Link
+                  className="entry-title-link"
+                  href={`/${entry.section}/${entry.slug}`}
+                >
+                  {entry.title}
+                </Link>
+              </NamedViewTransition>
+            </h2>
+            <p className="entry-meta entry-meta-primary">
+              <time dateTime={entry.publishedAt}>
+                {formatEditorialDate(entry.publishedAt)}
+              </time>
+              <span aria-hidden="true">·</span>
+              <span>{entry.readMinutes} min read</span>
+            </p>
+            {entry.summary && <p className="entry-summary">{entry.summary}</p>}
+            {entry.tags.length > 0 && (
+              <p className="entry-tags">{entry.tags.join(" · ")}</p>
+            )}
           </article>
         </li>
       ))}

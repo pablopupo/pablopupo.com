@@ -16,17 +16,17 @@ describe("public site identity", () => {
 
     expect(identity).toMatchObject({
       name: "Pablo Pupo",
-      headline: "Software Engineer, Applied AI",
+      headline: "AI Engineer at Handtevy",
       email: "pablofpupo23@gmail.com",
       location: "Miami, Florida",
       graduationOn: "2026-12-01",
     });
     expect(siteDescription).toContain("applied AI");
     expect(siteDescription).toBe(
-      "Software Engineer, Applied AI. Writing about applied AI, software engineering, open source, and classical piano."
+      "Computer science student at the University of Florida. AI Engineer at Handtevy. Writing about applied AI, software engineering, and classical piano."
     );
+    expect(siteDescription).not.toContain("open source");
     expect(siteDescription).not.toContain("piano as a classical pianist");
-    expect(siteDescription).not.toContain("Handtevy");
   });
 
   it("builds canonical URLs for entries and projects", () => {
@@ -53,7 +53,7 @@ describe("public site identity", () => {
       "@type": "Person",
       name: "Pablo Pupo",
       url: siteUrl,
-      jobTitle: "Software Engineer, Applied AI",
+      jobTitle: "AI Engineer at Handtevy",
       email: "mailto:pablofpupo23@gmail.com",
       image: `${siteUrl}/media/pablo-pupo-portrait.jpg`,
       homeLocation: { "@type": "Place", name: "Miami, Florida" },
@@ -67,6 +67,9 @@ describe("public site identity", () => {
       "https://github.com/pablopupo",
       "https://linkedin.com/in/pablopupo",
     ]);
+    expect(identity.structuredData.knowsAbout).not.toContain(
+      "Open-source software"
+    );
     expect(serializeJsonLd({ value: "</script>" })).toBe(
       '{"value":"\\u003c/script>"}'
     );

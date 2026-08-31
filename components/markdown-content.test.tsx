@@ -34,6 +34,54 @@ const answer = 42;
     expect(html).toContain("&lt;script&gt;");
   });
 
+  it("keeps headings unanchored by default", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent markdown="## Scope discipline" />
+    );
+
+    expect(html).toContain("<h2>Scope discipline</h2>");
+    expect(html).not.toContain('id="scope-discipline"');
+    expect(html).not.toContain('class="heading-anchor"');
+  });
+
+  it("adds a keyboard-accessible permalink when heading anchors are enabled", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent markdown="## Scope discipline" anchorHeadings />
+    );
+
+    expect(html).toContain('<h2 id="scope-discipline">');
+    expect(html).toContain('class="heading-anchor"');
+    expect(html).toContain('href="#scope-discipline"');
+    expect(html).toContain('aria-label="Permalink to Scope discipline"');
+    expect(html).toContain(">#</a>");
+  });
+
+  it("deduplicates normalized heading slugs within one document", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent
+        markdown={"## Scope discipline\n\n## Scope discipline!"}
+        anchorHeadings
+      />
+    );
+
+    expect(html).toContain('<h2 id="scope-discipline">');
+    expect(html).toContain('<h2 id="scope-discipline-2">');
+  });
+
+  it("uses visible inline formatting in heading slugs", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent
+        markdown={"## *Tool* `calls` and **schemas**"}
+        anchorHeadings
+      />
+    );
+
+    expect(html).toContain('<h2 id="tool-calls-and-schemas">');
+    expect(html).toContain("<em>Tool</em>");
+    expect(html).toContain("<code>calls</code>");
+    expect(html).toContain("<strong>schemas</strong>");
+  });
+
   it("renders wikilinks, safe images, and YouTube directives", () => {
     const html = renderToStaticMarkup(
       <MarkdownContent

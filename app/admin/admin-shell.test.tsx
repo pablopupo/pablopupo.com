@@ -12,6 +12,7 @@ describe("admin shell", () => {
 
     expect(html).toContain('<a href="/admin">Entries</a>');
     expect(html).toContain('<a href="/admin/work">Work</a>');
+    expect(html).toContain('<a href="/admin/graph">Graph</a>');
     expect(html).toContain('<a href="/admin/comments">Comments</a>');
     expect(html).toContain('<a href="/admin/analytics">Analytics</a>');
     expect(html).toContain(

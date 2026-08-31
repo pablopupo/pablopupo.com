@@ -8,6 +8,8 @@ import { validateMediaBytes } from "../media/validation";
 import { getAdminAccess } from "./access";
 import { hasSameOrigin, readAdminConfiguration } from "./auth";
 import { createAdminEntryHandlers } from "./handlers";
+import { createAdminGraphHandlers } from "./graph-handlers";
+import { createAdminGraphRepository } from "./graph-repository";
 import { createAdminMediaHandlers } from "./media-handlers";
 import { createAdminProjectHandlers } from "./project-handlers";
 import {
@@ -20,6 +22,7 @@ import { createAdminSettingsHandlers } from "./settings-handlers";
 
 type AdminEntryHandlers = ReturnType<typeof createAdminEntryHandlers>;
 type AdminProjectHandlers = ReturnType<typeof createAdminProjectHandlers>;
+type AdminGraphHandlers = ReturnType<typeof createAdminGraphHandlers>;
 type AdminSettingsHandlers = ReturnType<typeof createAdminSettingsHandlers>;
 type AdminMediaHandlers = ReturnType<typeof createAdminMediaHandlers>;
 
@@ -43,6 +46,11 @@ function revalidateProjectContent() {
   revalidatePath("/work");
   revalidatePath("/search");
   revalidatePath("/sitemap.xml");
+}
+
+function revalidateGraph() {
+  revalidatePath("/");
+  revalidatePath("/admin/graph");
 }
 
 export function readBlobConfiguration(
@@ -100,6 +108,31 @@ export async function withAdminProjectHandlers(
       now: () => new Date(),
       revalidate: revalidateProjectContent,
       repository: createAdminProjectRepository(database),
+    });
+    return await operation(handlers);
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function withAdminGraphHandlers(
+  operation: (handlers: AdminGraphHandlers) => Promise<Response>
+) {
+  const configuration = readAdminConfiguration(process.env);
+  if (!configuration) {
+    return Response.json({ error: "admin is not configured" }, { status: 503 });
+  }
+
+  const pool = new Pool({ connectionString: configuration.databaseUrl });
+  try {
+    const database = drizzle(pool, { schema });
+    const handlers = createAdminGraphHandlers({
+      authorize: getAdminAccess,
+      isSameOrigin: (request) =>
+        hasSameOrigin(request, configuration.betterAuthUrl),
+      now: () => new Date(),
+      revalidate: revalidateGraph,
+      repository: createAdminGraphRepository(database),
     });
     return await operation(handlers);
   } finally {

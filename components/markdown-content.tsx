@@ -11,6 +11,7 @@ import {
   youtubeRenderModel,
   youtubeVideoIdPattern,
 } from "@/lib/markdown/youtube";
+import CodeBlock from "./code-block";
 
 type MarkdownNode = {
   type: string;
@@ -34,8 +35,10 @@ type Definition = {
 };
 
 type RenderContext = {
+  anchorHeadings: boolean;
   definitions: Map<string, Definition>;
   escapedWikilinkMarker: string;
+  headingCounts: Map<string, number>;
 };
 
 const parser = unified().use(remarkParse).use(remarkDirective);
@@ -65,6 +68,39 @@ function normalizeIdentifier(value: string) {
 
 function restoreEscapedWikilinks(value: string, marker: string) {
   return value.split(marker).join("[[");
+}
+
+function headingText(node: MarkdownNode, marker: string): string {
+  if (node.type === "text" || node.type === "inlineCode") {
+    return restoreEscapedWikilinks(node.value ?? "", marker).replace(
+      wikilinkPattern,
+      (_wikilink, target: string, label: string | undefined) =>
+        (label || target).trim()
+    );
+  }
+  if (node.type === "image" || node.type === "imageReference") {
+    return node.alt ?? "";
+  }
+  return (node.children ?? [])
+    .map((child) => headingText(child, marker))
+    .join("");
+}
+
+function headingId(node: MarkdownNode, context: RenderContext) {
+  const text = headingText(node, context.escapedWikilinkMarker).trim();
+  const base =
+    text
+      .normalize("NFKD")
+      .toLowerCase()
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "section";
+  const count = (context.headingCounts.get(base) ?? 0) + 1;
+  context.headingCounts.set(base, count);
+  return {
+    id: count === 1 ? base : `${base}-${count}`,
+    label: text || "section",
+  };
 }
 
 function textWithWikilinks(
@@ -165,7 +201,24 @@ function renderNode(
       return <p key={key}>{children(node, key, context)}</p>;
     case "heading": {
       const depth = Math.min(6, Math.max(1, node.depth ?? 2));
-      return createElement(`h${depth}`, { key }, children(node, key, context));
+      const content = children(node, key, context);
+      if (!context.anchorHeadings) {
+        return createElement(`h${depth}`, { key }, content);
+      }
+      const heading = headingId(node, context);
+      return createElement(
+        `h${depth}`,
+        { id: heading.id, key },
+        ...content,
+        <a
+          aria-label={`Permalink to ${heading.label}`}
+          className="heading-anchor"
+          href={`#${heading.id}`}
+          key={`${key}-anchor`}
+        >
+          #
+        </a>
+      );
     }
     case "strong":
       return <strong key={key}>{children(node, key, context)}</strong>;
@@ -185,14 +238,14 @@ function renderNode(
     case "code": {
       const language = node.lang?.replace(/[^A-Za-z0-9_+-]/g, "");
       return (
-        <pre key={key}>
-          <code className={language ? `language-${language}` : undefined}>
-            {restoreEscapedWikilinks(
-              node.value ?? "",
-              context.escapedWikilinkMarker
-            )}
-          </code>
-        </pre>
+        <CodeBlock
+          code={restoreEscapedWikilinks(
+            node.value ?? "",
+            context.escapedWikilinkMarker
+          )}
+          key={key}
+          language={language}
+        />
       );
     }
     case "blockquote":
@@ -319,15 +372,19 @@ function definitions(root: MarkdownNode) {
 export default function MarkdownContent({
   markdown,
   className,
+  anchorHeadings = false,
 }: {
   markdown: string;
   className?: string;
+  anchorHeadings?: boolean;
 }) {
   const protectedSource = protectedMarkdown(markdown);
   const tree = parser.parse(protectedSource.markdown) as unknown as MarkdownNode;
   const context = {
+    anchorHeadings,
     definitions: definitions(tree),
     escapedWikilinkMarker: protectedSource.marker,
+    headingCounts: new Map<string, number>(),
   };
   const classes = className
     ? `markdown-content ${className}`

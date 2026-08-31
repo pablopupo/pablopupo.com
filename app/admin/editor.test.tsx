@@ -1,11 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Editor, {
+  completedEditorSave,
+  editorSaveChangedDuringRequest,
   formatDateTimeLocal,
   parseDateTimeLocal,
   parseTagInput,
   nextDocumentGeneration,
   runBusyEditorOperation,
+  saveEntryAndPreview,
   shouldDiscardUnsavedChanges,
   shouldRestoreRevision,
   unsavedEntryActionMessage,
@@ -103,6 +106,107 @@ describe("admin editor behavior", () => {
       "Restore revision 7? Current content will become a new revision."
     );
   });
+
+  it("distinguishes a preview-safe save from one that preserved newer local edits", () => {
+    expect(
+      completedEditorSave(
+        "11111111-1111-4111-8111-111111111111",
+        false
+      )
+    ).toEqual({
+      status: "saved-latest",
+      id: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(
+      completedEditorSave(
+        "11111111-1111-4111-8111-111111111111",
+        true
+      )
+    ).toEqual({ status: "saved-with-newer-edits" });
+  });
+
+  it("treats a schedule edit made during saving as a newer local edit", () => {
+    expect(
+      editorSaveChangedDuringRequest({
+        submittedEditGeneration: 4,
+        currentEditGeneration: 4,
+        submittedScheduledAt: "2026-08-20T09:00",
+        currentScheduledAt: "2026-08-21T09:00",
+      })
+    ).toBe(true);
+    expect(
+      editorSaveChangedDuringRequest({
+        submittedEditGeneration: 4,
+        currentEditGeneration: 4,
+        submittedScheduledAt: "2026-08-20T09:00",
+        currentScheduledAt: "2026-08-20T09:00",
+      })
+    ).toBe(false);
+  });
+
+  it("reserves the preview window before saving and shows only the saved latest record", async () => {
+    const events: string[] = [];
+    const result = await saveEntryAndPreview(
+      async () => {
+        events.push("save");
+        return {
+          status: "saved-latest" as const,
+          id: "11111111-1111-4111-8111-111111111111",
+        };
+      },
+      () => {
+        events.push("open");
+        return {
+          show: (href: string) => events.push(`show:${href}`),
+          cancel: () => events.push("cancel"),
+        };
+      }
+    );
+
+    expect(result).toEqual({
+      status: "saved-latest",
+      id: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(events).toEqual([
+      "open",
+      "save",
+      "show:/admin/preview/entries/11111111-1111-4111-8111-111111111111",
+    ]);
+  });
+
+  it.each([
+    { status: "failed" as const },
+    { status: "busy" as const },
+    { status: "saved-with-newer-edits" as const },
+  ])("cancels a reserved preview for $status", async (saveResult) => {
+    const show = vi.fn();
+    const cancel = vi.fn();
+
+    await saveEntryAndPreview(
+      async () => saveResult,
+      () => ({ show, cancel })
+    );
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it("closes the reserved preview when saving rejects unexpectedly", async () => {
+    const show = vi.fn();
+    const cancel = vi.fn();
+
+    await expect(
+      saveEntryAndPreview(
+        async () => {
+          throw new Error("editor snapshot failed");
+        },
+        () => ({ show, cancel })
+      )
+    ).resolves.toEqual({ status: "failed" });
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(show).not.toHaveBeenCalled();
+  });
 });
 
 describe("admin editor states", () => {
@@ -153,6 +257,7 @@ describe("admin editor states", () => {
       "Raw Markdown",
       "Loading rich editor",
       "Save",
+      "Save &amp; Preview",
       "Publish now",
       "Schedule",
       "Unpublish",

@@ -26,6 +26,23 @@ export type PublicEntry = {
   performance: PublicPerformance | null;
 };
 
+type NeighborEntry = Pick<PublicEntry, "slug" | "section" | "publishedAt">;
+
+export function entryNeighbors<T extends NeighborEntry>(
+  entries: readonly T[],
+  current: Pick<NeighborEntry, "slug" | "section">
+) {
+  const ordered = entries
+    .filter((entry) => entry.section === current.section)
+    .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt));
+  const index = ordered.findIndex((entry) => entry.slug === current.slug);
+  if (index === -1) return { newer: null, older: null };
+  return {
+    newer: ordered[index - 1] ?? null,
+    older: ordered[index + 1] ?? null,
+  };
+}
+
 export type PublicProjectLink = {
   kind: "repository" | "live" | "demo" | "writeup" | "other";
   label: string;
@@ -114,6 +131,7 @@ type LegacyProject = {
   title: string;
   bodyMarkdown: string;
   publishedAt: Date;
+  featured: boolean;
   technologies: string[];
   links: Array<PublicProjectLink & { sortOrder: number }>;
 };
@@ -208,7 +226,7 @@ function legacyProject(project: LegacyProject): PublicProject {
       project.publishedAt,
       `Legacy project ${project.slug}`
     ),
-    featured: false,
+    featured: project.featured,
     technologies: project.technologies,
     links: project.links.map(({ kind, label, url }) => ({ kind, label, url })),
   };

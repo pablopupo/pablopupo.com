@@ -25,7 +25,7 @@ export function serializeJsonLd(value: unknown) {
 }
 
 export function createProfileDescription(profile: PublicProfile) {
-  return `${profile.headline}. Writing about applied AI, software engineering, open source, and classical piano.`;
+  return `Computer science student at the University of Florida. ${profile.headline}. Writing about applied AI, software engineering, and classical piano.`;
 }
 
 function graduationLabel(graduationOn: string) {
@@ -42,9 +42,11 @@ export function createSiteIdentity(profile: PublicProfile) {
   const description = [
     createProfileDescription(profile),
     profile.graduationOn
-      ? `Computer science student at the University of Florida with expected graduation in ${graduationLabel(profile.graduationOn)}.`
-      : "Computer science student at the University of Florida.",
-  ].join(" ");
+      ? `Expected graduation in ${graduationLabel(profile.graduationOn)}.`
+      : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" ");
   const sameAs = [
     profile.githubUrl,
     profile.linkedinUrl,
@@ -65,7 +67,6 @@ export function createSiteIdentity(profile: PublicProfile) {
     knowsAbout: [
       "Applied artificial intelligence",
       "Software engineering",
-      "Open-source software",
       "Classical piano",
     ],
     ...(profile.contactEmail

@@ -25,6 +25,7 @@ import {
 } from "./editor-persistence";
 import { AdminAccessState, AdminShell } from "./admin-shell";
 import MarkdownEditor, { type MarkdownSnapshot } from "./markdown-editor";
+import { preparePreviewWindow } from "@/lib/admin/preview-window";
 
 type AdminMode = "unconfigured" | "signed-out" | "forbidden" | "authorized";
 
@@ -98,6 +99,12 @@ type EditorProps = {
   mode: AdminMode;
   configurationStatus?: ConfigurationStatus;
 };
+
+export type EditorSaveResult =
+  | { status: "saved-latest"; id: string }
+  | { status: "saved-with-newer-edits" }
+  | { status: "busy" }
+  | { status: "failed" };
 
 const blankPerformance: PerformanceFields = {
   workTitle: "",
@@ -173,6 +180,47 @@ export function shouldRestoreRevision(
   return confirmRestore(
     `Restore revision ${revisionNumber}? Current content will become a new revision.`
   );
+}
+
+export function completedEditorSave(
+  id: string,
+  newerLocalEdits: boolean
+): EditorSaveResult {
+  return newerLocalEdits
+    ? { status: "saved-with-newer-edits" }
+    : { status: "saved-latest", id };
+}
+
+export function editorSaveChangedDuringRequest(input: {
+  submittedEditGeneration: number;
+  currentEditGeneration: number;
+  submittedScheduledAt: string;
+  currentScheduledAt: string;
+}) {
+  return (
+    input.currentEditGeneration !== input.submittedEditGeneration ||
+    input.currentScheduledAt !== input.submittedScheduledAt
+  );
+}
+
+export async function saveEntryAndPreview(
+  save: () => Promise<EditorSaveResult>,
+  prepare: typeof preparePreviewWindow = preparePreviewWindow
+) {
+  const preview = prepare();
+  let result: EditorSaveResult;
+  try {
+    result = await save();
+  } catch {
+    preview.cancel();
+    return { status: "failed" } as const;
+  }
+  if (result.status === "saved-latest") {
+    preview.show(`/admin/preview/entries/${encodeURIComponent(result.id)}`);
+  } else {
+    preview.cancel();
+  }
+  return result;
 }
 
 export async function runBusyEditorOperation<T>(
@@ -285,8 +333,10 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   const bodyMarkdownSnapshot = useRef<MarkdownSnapshot>(() => "");
   const activeSaveEpochs = useRef(new Set<number>());
   const queuedSaveEpochs = useRef(new Set<number>());
-  const saveRef = useRef<(source?: "manual" | "autosave") => Promise<void>>(
-    async () => undefined
+  const saveRef = useRef<
+    (source?: "manual" | "autosave" | "preview") => Promise<EditorSaveResult>
+  >(
+    async () => ({ status: "failed" })
   );
 
   function runBusy<T>(operation: () => Promise<T>) {
@@ -441,10 +491,12 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     });
   }
 
-  async function save(source: "manual" | "autosave" = "manual") {
+  async function save(
+    source: "manual" | "autosave" | "preview" = "manual"
+  ): Promise<EditorSaveResult> {
     if (!entry.slug.trim() || !entry.title.trim()) {
       setMessage("Title and slug are required");
-      return;
+      return { status: "failed" };
     }
     const requestedDocumentEpoch = documentEpoch.current;
     if (
@@ -454,10 +506,10 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       )
     ) {
       queuedSaveEpochs.current.add(requestedDocumentEpoch);
-      return;
+      return { status: "busy" };
     }
     activeSaveEpochs.current.add(requestedDocumentEpoch);
-    if (source === "manual") setBusy(true);
+    if (source !== "autosave") setBusy(true);
     setMessage("");
     setPersistenceStatus("saving");
 
@@ -467,6 +519,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     };
     const submittedTagsInput = tagsInput;
     const submittedEditGeneration = editGeneration.current;
+    const submittedScheduledAt = scheduledAtSnapshot.current;
     const submittedDocumentEpoch = requestedDocumentEpoch;
     const creating = !submittedEntry.id;
     let retryQueuedSave = false;
@@ -500,24 +553,30 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         }
       );
       const payload = await responsePayload(response);
-      if (documentEpoch.current !== submittedDocumentEpoch) return;
+      if (documentEpoch.current !== submittedDocumentEpoch) {
+        return { status: "failed" };
+      }
 
       if (response.status === 409) {
         applyPersistenceState(failedSaveState(true));
         setMessage(
           payload?.error ?? "Conflict: entry changed in another session"
         );
-        return;
+        return { status: "failed" };
       }
       if (!response.ok || !payload?.entry) {
         applyPersistenceState(failedSaveState(false));
         setMessage(payload?.error ?? `Save failed (${response.status})`);
-        return;
+        return { status: "failed" };
       }
 
       const saved = normalizeEntry(payload.entry);
-      const changedDuringRequest =
-        editGeneration.current !== submittedEditGeneration;
+      const changedDuringRequest = editorSaveChangedDuringRequest({
+        submittedEditGeneration,
+        currentEditGeneration: editGeneration.current,
+        submittedScheduledAt,
+        currentScheduledAt: scheduledAtSnapshot.current,
+      });
       setEntry((current) =>
         reconcileSavedEntry(current, saved, changedDuringRequest)
       );
@@ -527,15 +586,25 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       applyPersistenceState(successfulSaveState(changedDuringRequest));
       retryQueuedSave = true;
       setLastSavedAt(new Date());
-      setMessage(creating ? "Draft created" : "Saved");
+      setMessage(
+        changedDuringRequest
+          ? "Saved; newer local edits remain unsaved"
+          : creating
+            ? "Draft created"
+            : "Saved"
+      );
       void loadEntries();
       const savedId = saved.id ?? submittedEntry.id;
       if (savedId) void loadRevisions(savedId, submittedDocumentEpoch);
+      return savedId
+        ? completedEditorSave(savedId, changedDuringRequest)
+        : { status: "failed" };
     } catch {
       if (documentEpoch.current === submittedDocumentEpoch) {
         applyPersistenceState(failedSaveState(false));
         setMessage("Network request failed");
       }
+      return { status: "failed" };
     } finally {
       activeSaveEpochs.current.delete(submittedDocumentEpoch);
       const saveWasQueued = queuedSaveEpochs.current.delete(
@@ -548,7 +617,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       ) {
         setSaveRetrySequence((current) => current + 1);
       }
-      if (source === "manual") setBusy(false);
+      if (source !== "autosave") setBusy(false);
     }
   }
 
@@ -1025,6 +1094,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
 
           <div className="admin-actions">
             <button type="button" onClick={() => void save("manual")} disabled={busy || persistenceStatus === "saving" || !entry.slug || !entry.title}>Save</button>
+            <button type="button" onClick={() => void saveEntryAndPreview(() => saveRef.current("preview"))} disabled={busy || persistenceStatus === "saving" || !entry.slug || !entry.title}>Save &amp; Preview</button>
             <button type="button" onClick={() => runAction("publish")} disabled={busy || !entry.id}>Publish now</button>
             <label>Schedule time<input type="datetime-local" value={scheduledAt} onChange={(event) => changeScheduledAt(event.target.value)} /></label>
             <button type="button" onClick={() => runAction("schedule")} disabled={busy || !entry.id || !scheduledAt}>Schedule</button>

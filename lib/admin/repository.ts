@@ -5,9 +5,11 @@ import {
   entries,
   entryMusicDetails,
   entryRevisions,
+  knowledgeGraphNodes,
   type EntryPerformanceDetailsSnapshot,
 } from "../db/schema";
 import type * as schema from "../db/schema";
+import { entryGraphSnapshot } from "../db/graph-sync";
 import { analyzeAuthoringMarkdown } from "../markdown/youtube";
 
 type PerformanceInput = {
@@ -287,6 +289,21 @@ export function createAdminEntryRepository<TQueryResult extends PgQueryResultHKT
           .where(and(eq(entries.id, id), eq(entries.version, expectedVersion)))
           .returning();
         if (!updated[0]) throw new EntryConflictError("Entry version is stale");
+        const graphNode = entryGraphSnapshot(updated[0]);
+        await transaction
+          .insert(knowledgeGraphNodes)
+          .values({ ...graphNode, createdAt: now, updatedAt: now })
+          .onConflictDoUpdate({
+            target: knowledgeGraphNodes.entryId,
+            set: {
+              label: graphNode.label,
+              kind: graphNode.kind,
+              href: graphNode.href,
+              body: graphNode.body,
+              origin: graphNode.origin,
+              updatedAt: now,
+            },
+          });
 
         await transaction
           .delete(entryMusicDetails)
@@ -349,6 +366,21 @@ export function createAdminEntryRepository<TQueryResult extends PgQueryResultHKT
             updatedAt: now,
           })
           .returning();
+        const graphNode = entryGraphSnapshot(inserted[0]!);
+        await transaction
+          .insert(knowledgeGraphNodes)
+          .values({ ...graphNode, createdAt: now, updatedAt: now })
+          .onConflictDoUpdate({
+            target: knowledgeGraphNodes.entryId,
+            set: {
+              label: graphNode.label,
+              kind: graphNode.kind,
+              href: graphNode.href,
+              body: graphNode.body,
+              origin: graphNode.origin,
+              updatedAt: now,
+            },
+          });
         if (kind === "performance" && input.performance) {
           await transaction.insert(entryMusicDetails).values({
             entryId: id,
@@ -428,6 +460,21 @@ export function createAdminEntryRepository<TQueryResult extends PgQueryResultHKT
           .where(and(eq(entries.id, id), eq(entries.version, expectedVersion)))
           .returning();
         if (!updated[0]) throw new EntryConflictError("Entry version is stale");
+        const graphNode = entryGraphSnapshot(updated[0]);
+        await transaction
+          .insert(knowledgeGraphNodes)
+          .values({ ...graphNode, createdAt: now, updatedAt: now })
+          .onConflictDoUpdate({
+            target: knowledgeGraphNodes.entryId,
+            set: {
+              label: graphNode.label,
+              kind: graphNode.kind,
+              href: graphNode.href,
+              body: graphNode.body,
+              origin: graphNode.origin,
+              updatedAt: now,
+            },
+          });
 
         await transaction
           .delete(entryMusicDetails)

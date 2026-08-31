@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 const approvedAssets = [
   {
     path: "public/media/pablo-pupo-portrait.jpg",
-    byteSize: 578_420,
-    sha256: "a26ce2ad31296fb149e124517a0faecf31d2c3ed1a24ef44b59171ce3e0b57ea",
+    byteSize: 30_071,
+    sha256: "ecc5d0f3a1f47715783a9cf604de128a18a89ec1b2f7df6357a1e31a500b2dfc",
   },
   {
     path: "public/Pablo-Pupo-Resume.pdf",
@@ -34,8 +34,8 @@ describe("approved public profile assets", () => {
 
     expect(metadata).toMatchObject({
       format: "jpeg",
-      width: 2848,
-      height: 4272,
+      width: 460,
+      height: 460,
     });
   });
 
