@@ -40,12 +40,10 @@ describe("public color contrast", () => {
     expect(contrast(color("muted"), color("bg"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("defines an explicit dark palette and lets the system lead before manual choice", () => {
+  it("defines explicit light and dark palettes without automatic system switching", () => {
     expect(css).toMatch(/:root\[data-theme="dark"\]\s*\{/);
     expect(css).toMatch(/:root\[data-theme="light"\]\s*\{/);
-    expect(css).toMatch(
-      /@media\s*\(prefers-color-scheme:\s*dark\)[\s\S]*:root:not\(\[data-theme\]\)/
-    );
+    expect(css).not.toMatch(/prefers-color-scheme/);
   });
 });
 

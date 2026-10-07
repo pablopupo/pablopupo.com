@@ -9,38 +9,25 @@ import {
   type SiteTheme,
 } from "./theme";
 
-function effectiveTheme(media: MediaQueryList): SiteTheme {
-  return (
-    storedTheme(document.documentElement.dataset.theme) ??
-    (media.matches ? "dark" : "light")
-  );
+function effectiveTheme(): SiteTheme {
+  return storedTheme(document.documentElement.dataset.theme) ?? "light";
 }
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<SiteTheme | null>(null);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const sync = () => setTheme(effectiveTheme(media));
-    const syncSystemTheme = () => {
-      if (!storedTheme(document.documentElement.dataset.theme)) sync();
-    };
+    const sync = () => setTheme(effectiveTheme());
 
     sync();
-    media.addEventListener("change", syncSystemTheme);
     window.addEventListener(THEME_CHANGE_EVENT, sync);
     return () => {
-      media.removeEventListener("change", syncSystemTheme);
       window.removeEventListener(THEME_CHANGE_EVENT, sync);
     };
   }, []);
 
   function toggleTheme() {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const next = nextTheme(
-      document.documentElement.dataset.theme,
-      media.matches
-    );
+    const next = nextTheme(document.documentElement.dataset.theme);
     document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem(THEME_STORAGE_KEY, next);

@@ -2,7 +2,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 describe("site theme", () => {
-  it("keeps the system preference until a valid manual choice exists", async () => {
+  it("accepts only a valid manual theme choice", async () => {
     const theme = await import("./theme").catch(() => undefined);
 
     expect(theme?.storedTheme).toBeTypeOf("function");
@@ -16,13 +16,13 @@ describe("site theme", () => {
     const theme = await import("./theme").catch(() => undefined);
 
     expect(theme?.nextTheme).toBeTypeOf("function");
-    expect(theme?.nextTheme(null, true)).toBe("light");
-    expect(theme?.nextTheme(null, false)).toBe("dark");
-    expect(theme?.nextTheme("dark", false)).toBe("light");
-    expect(theme?.nextTheme("light", true)).toBe("dark");
+    expect(theme?.nextTheme(null)).toBe("dark");
+    expect(theme?.nextTheme("system")).toBe("dark");
+    expect(theme?.nextTheme("dark")).toBe("light");
+    expect(theme?.nextTheme("light")).toBe("dark");
   });
 
-  it("restores only a valid saved override before the page paints", async () => {
+  it("defaults to light and restores a valid saved override before paint", async () => {
     const theme = await import("./theme").catch(() => undefined);
 
     expect(theme?.themeBootstrapScript).toEqual(expect.any(String));
@@ -46,7 +46,7 @@ describe("site theme", () => {
 
     expect(boot("dark")).toBe("dark");
     expect(boot("light")).toBe("light");
-    expect(boot("system")).toBeUndefined();
-    expect(boot(null)).toBeUndefined();
+    expect(boot("system")).toBe("light");
+    expect(boot(null)).toBe("light");
   });
 });

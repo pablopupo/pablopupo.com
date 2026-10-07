@@ -40,6 +40,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="light"
       className={newsreader.variable}
       data-scroll-behavior="smooth"
       suppressHydrationWarning
