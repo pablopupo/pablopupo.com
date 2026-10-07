@@ -4,6 +4,7 @@ import matter from "gray-matter";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import {
   entries,
+  entryMusicDetails,
   knowledgeGraphEdges,
   knowledgeGraphNodes,
   openSourceContributions,
@@ -13,10 +14,11 @@ import {
 } from "./schema";
 import { entryTagsSchema } from "./validation";
 import type * as schema from "./schema";
+import { readPostPerformance, type Post } from "../posts";
 
 type LegacyEntry = {
   slug: string;
-  kind: "essay";
+  kind: "essay" | "performance";
   section: "writing" | "music";
   tags: string[];
   status: "draft" | "published";
@@ -24,6 +26,7 @@ type LegacyEntry = {
   summary: string | null;
   bodyMarkdown: string;
   publishedAt: Date;
+  performance?: Post["performance"];
 };
 
 type LegacyProject = {
@@ -88,7 +91,19 @@ const legacyProjects: LegacyProject[] = [
     status: "published",
     title: "Gradus ad Parnassum",
     bodyMarkdown:
-      "RAG over musical notation. It parses scores, annotates them the way a musician would, and answers theory questions with measure references. First corpus is the Chopin Etudes. Early days; the long game is notation-native generation grounded in retrieval.",
+      `An early exploration of retrieval over musical notation, working toward answers grounded in specific measures of a score.
+
+## The question
+
+What would it take to ask a score a musical question and get an answer that points to the relevant measures? For example: where does Chopin bring out a left-hand melody against the right, or use a deceptive cadence at the end of a phrase?
+
+## The approach
+
+The project explores parsing MusicXML and kern scores, annotating passages with musical structure, and retrieving them in response to a question. The initial corpus target is the Chopin Etudes. My role as a pianist informs the questions and the measure references used to evaluate the answers.
+
+## Current stage
+
+This is early work. The intended evaluation compares retrieved passages with a hand-written set of questions and known measure answers. Results have not yet been published. The longer-term goal is notation-native generation grounded in retrieval.`,
     publishedAt: projectPublishedAt,
     sortOrder: 0,
     featured: true,
@@ -108,7 +123,11 @@ const legacyProjects: LegacyProject[] = [
     status: "published",
     title: "Kit AI",
     bodyMarkdown:
-      "An offline-first emergency first-aid PWA built with a hackathon team. I worked on its IndexedDB retrieval layer, online/offline text-to-speech fallback, and a related fine-tuned Llama 3.2 3B model. The model remains an experiment and is not yet wired into the app.",
+      `An offline-first emergency first-aid PWA built with a hackathon team, with local retrieval and online/offline text-to-speech.
+
+## The model experiment
+
+I also worked on a related fine-tuned Llama 3.2 3B model. The model remains an experiment and is not yet wired into the app. The repository, app, model, and model demo are linked below so each part can be explored separately.`,
     publishedAt: projectPublishedAt,
     sortOrder: 1,
     featured: true,
@@ -146,19 +165,20 @@ const legacyProjects: LegacyProject[] = [
     status: "published",
     title: "Nova",
     bodyMarkdown:
-      "A Solana Pay invoicing app with QR payments, transaction tracking, and dashboards. It won Best Use of Solana at SwampHacks.",
+      `A Solana Pay invoicing app with QR payments, transaction tracking, and dashboards. It won Best Use of Solana at SwampHacks.
+
+## The project
+
+Nova brings invoicing and payment tracking into one application. QR payments provide a way to start a Solana Pay transaction, while the dashboard organizes invoices and transaction information.
+
+## Recognition
+
+The project received Best Use of Solana at SwampHacks.`,
     publishedAt: projectPublishedAt,
     sortOrder: 2,
     featured: true,
     technologies: ["Solana Pay"],
-    links: [
-      {
-        kind: "repository",
-        label: "github",
-        url: "https://github.com/pablopupo/Nova",
-        sortOrder: 0,
-      },
-    ],
+    links: [],
   },
   {
     slug: "accordo",
@@ -166,7 +186,7 @@ const legacyProjects: LegacyProject[] = [
     status: "published",
     title: "Accordo",
     bodyMarkdown:
-      "A booking and payments marketplace I founded for musicians, covering bookings, contracts, and payment workflows.",
+      "A platform I’m building to connect musicians with one another and with opportunities. Our ambition is to modernize the music community.",
     publishedAt: projectPublishedAt,
     sortOrder: 3,
     featured: false,
@@ -177,6 +197,7 @@ const legacyProjects: LegacyProject[] = [
 
 export function parseLegacyPost(raw: string, slug: string): LegacyEntry {
   const parsed = matter(raw);
+  const performance = readPostPerformance(parsed.data);
   const tags = entryTagsSchema.parse(
     Array.isArray(parsed.data.tags) ? parsed.data.tags : []
   );
@@ -190,8 +211,8 @@ export function parseLegacyPost(raw: string, slug: string): LegacyEntry {
 
   return {
     slug,
-    kind: "essay",
-    section: tags.some((tag) => tag.toLowerCase() === "music")
+    kind: performance ? "performance" : "essay",
+    section: performance || tags.some((tag) => tag.toLowerCase() === "music")
       ? "music"
       : "writing",
     tags,
@@ -201,6 +222,7 @@ export function parseLegacyPost(raw: string, slug: string): LegacyEntry {
       typeof parsed.data.description === "string" ? parsed.data.description : null,
     bodyMarkdown: parsed.content.trimEnd(),
     publishedAt,
+    ...(performance ? { performance } : {}),
   };
 }
 
@@ -296,9 +318,10 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
   const content = loadLegacyContent(root);
 
   for (const entry of content.entries) {
-    await database
+    const { performance, ...record } = entry;
+    const [stored] = await database
       .insert(entries)
-      .values(entry)
+      .values(record)
       .onConflictDoUpdate({
         target: entries.slug,
         set: {
@@ -311,7 +334,20 @@ export async function importLegacyContent<TQueryResult extends PgQueryResultHKT>
           bodyMarkdown: entry.bodyMarkdown,
           publishedAt: entry.publishedAt,
         },
-      });
+      })
+      .returning({ id: entries.id });
+    if (performance && stored) {
+      const details = {
+        ...performance,
+        performedAt: performance.performedAt ? new Date(performance.performedAt) : null,
+      };
+      await database.insert(entryMusicDetails)
+        .values({ entryId: stored.id, ...details })
+        .onConflictDoUpdate({
+          target: entryMusicDetails.entryId,
+          set: details,
+        });
+    }
   }
 
   for (const project of content.projects) {

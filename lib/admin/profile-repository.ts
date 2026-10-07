@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { media, siteSettings } from "../db/schema";
 import type * as schema from "../db/schema";
+import type { PageCopyPatch } from "../page-copy";
 
 export type SettingsPatch = {
   siteTitle?: string;
@@ -10,6 +11,7 @@ export type SettingsPatch = {
   graduationOn?: string | null;
   introMarkdown?: string;
   aboutMarkdown?: string;
+  pageCopy?: PageCopyPatch;
   contactEmail?: string | null;
   githubUrl?: string | null;
   linkedinUrl?: string | null;
@@ -76,6 +78,7 @@ function publicSettings(
     graduationOn: row.graduationOn,
     introMarkdown: row.introMarkdown,
     aboutMarkdown: row.aboutMarkdown,
+    pageCopy: row.pageCopy,
     contactEmail: row.contactEmail,
     githubUrl: row.githubUrl,
     linkedinUrl: row.linkedinUrl,
@@ -161,6 +164,7 @@ export function createAdminSettingsRepository<
           .update(siteSettings)
           .set({
             ...patch,
+            ...(patch.pageCopy ? { pageCopy: { ...current.pageCopy, ...patch.pageCopy } } : {}),
             version: expectedVersion + 1,
             updatedAt: now,
           })

@@ -18,11 +18,13 @@ beforeEach(() => {
   mocks.getPublicEntries.mockResolvedValue([
     {
       slug: "retrieval-notes",
+      tags: [],
       section: "writing",
       publishedAt: "2026-07-20T12:00:00.000Z",
     },
     {
       slug: "chopin-ballade",
+      tags: [],
       section: "music",
       publishedAt: "2026-07-21T12:00:00.000Z",
     },
@@ -40,6 +42,13 @@ beforeEach(() => {
 });
 
 describe("sitemap", () => {
+  it("includes only series built from public entries", async () => {
+    mocks.getPublicEntries.mockResolvedValue([{ slug: "part-one", section: "music", tags: ["series:Weekly recordings"], publishedAt: "2026-09-01" }, { slug: "part-two", section: "music", tags: ["series:Weekly recordings"], publishedAt: "2026-09-08" }]);
+    const { default: sitemap } = await import("./sitemap");
+    const pages = await sitemap();
+    expect(pages.filter((page) => page.url.includes("/series/"))).toEqual([{ url: `${siteUrl}/music/series/weekly-recordings`, lastModified: new Date("2026-09-08") }]);
+  });
+
   it("refreshes scheduled visibility within 60 seconds", async () => {
     const route = await import("./sitemap");
 
@@ -57,9 +66,14 @@ describe("sitemap", () => {
       `${siteUrl}/writing`,
       `${siteUrl}/music`,
       `${siteUrl}/about`,
+      `${siteUrl}/work/notes`,
+      `${siteUrl}/work/contributions`,
+      `${siteUrl}/accordo`,
       `${siteUrl}/resume`,
       `${siteUrl}/writing/retrieval-notes`,
       `${siteUrl}/music/chopin-ballade`,
+      `${siteUrl}/work/gradus-ad-parnassum`,
+      `${siteUrl}/work/newer-project`,
     ]);
     expect(entries).not.toContainEqual(
       expect.objectContaining({ url: `${siteUrl}/search` })

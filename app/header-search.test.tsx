@@ -16,10 +16,12 @@ vi.mock("next/link", () => ({
   default: ({
     children,
     href,
+    transitionTypes: _transitionTypes,
     ...props
   }: AnchorHTMLAttributes<HTMLAnchorElement> & {
     children: ReactNode;
     href: string;
+    transitionTypes?: string[];
   }) => (
     <a href={href} data-next-link="true" {...props}>
       {children}
@@ -114,6 +116,8 @@ describe("header search", () => {
     );
     expect(html).toContain("Reliability notes");
     expect(html).toContain("Showing 1 of 8 results.");
+    expect(html).toContain('href="/search?q=reliability"');
+    expect(html).toContain("View all 8 results");
   });
 
   it("lets the GET form submit instead of swallowing Enter and button clicks", () => {

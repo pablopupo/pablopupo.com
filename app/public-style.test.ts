@@ -82,7 +82,7 @@ describe("homepage identity layout", () => {
     expect(portraitImage).not.toMatch(/transform/);
   });
 
-  it("uses a focused prose measure and stronger introduction typography", () => {
+  it("uses readable introduction typography beneath the visible name", () => {
     const readingShell = css.match(/\.reading-shell\s*\{([^}]*)\}/)?.[1];
     const introduction = css.match(
       /\.hero-copy > \.markdown-content\s*\{([^}]*)\}/
@@ -90,8 +90,8 @@ describe("homepage identity layout", () => {
 
     expect(readingShell).toContain("42rem");
     expect(introduction).toContain("color: var(--ink)");
-    expect(introduction).toMatch(/font-size:\s*1\.(?:18|2)rem/);
-    expect(introduction).toMatch(/font-weight:\s*(?:5[5-9]0|600)/);
+    expect(introduction).toContain("font-size: 1rem");
+    expect(introduction).toContain("line-height: 1.6");
   });
 
   it("separates the introduction from the unboxed graph with one hairline", () => {
@@ -106,20 +106,12 @@ describe("homepage identity layout", () => {
     expect(graph).not.toMatch(/background/);
   });
 
-  it("lets the graph break out from the editorial shell without widening mobile", () => {
+  it("aligns the graph with the editorial shell on every screen size", () => {
     const graph = css.match(/\.home-connections\s*\{([^}]*)\}/)?.[1];
     const layout = css.match(/\.graph-layout\s*\{([^}]*)\}/)?.[1];
-    const mobileStyles = css.slice(css.indexOf("@media (max-width: 520px)"));
-    const mobileGraph = mobileStyles.match(
-      /\.home-connections\s*\{([^}]*)\}/
-    )?.[1];
-
-    expect(graph).toContain("width: min(100vw - 2.5rem, 52rem)");
-    expect(graph).toContain("margin-left: 50%");
-    expect(graph).toContain("transform: translateX(-50%)");
+    expect(graph).toContain("width: 100%");
+    expect(graph).not.toMatch(/margin-left|transform|100vw/);
     expect(layout).toContain("25rem");
-    expect(mobileGraph).toContain("width: 100%");
-    expect(mobileGraph).toContain("transform: none");
   });
 
   it("keeps homepage icon links separate from About-page text links", () => {
@@ -143,7 +135,7 @@ describe("homepage identity layout", () => {
     );
   });
 
-  it("keeps header controls large enough and removes covered links from focus", () => {
+  it("keeps header controls large enough", () => {
     const navigationTargets = css.match(
       /body > header nav a\s*\{([^}]*)\}/
     )?.[1];
@@ -154,9 +146,6 @@ describe("homepage identity layout", () => {
     const toggle = css.match(/\.header-search-toggle\s*\{([^}]*)\}/)?.[1];
     const input = css.match(/\.header-search-input\s*\{([^}]*)\}/)?.[1];
     const submit = css.match(/\.header-search-submit\s*\{([^}]*)\}/)?.[1];
-    const coveredLinks = css.match(
-      /body > header nav:has\(\.header-search-toggle\[aria-expanded="true"\]\)\s*> \.nav-links\s*> a,\s*body > header nav:has\(\.header-search-toggle\[aria-expanded="true"\]\)\s*> \.wordmark\s*\{([^}]*)\}/
-    )?.[1];
 
     expect(navigationTargets).toContain("min-width: 2.75rem");
     expect(wordmark).toContain("font-size: 1.4rem");
@@ -167,7 +156,6 @@ describe("homepage identity layout", () => {
     expect(toggle).toContain("height: 2.75rem");
     expect(input).toContain("min-height: 2.75rem");
     expect(submit).toContain("min-height: 2.75rem");
-    expect(coveredLinks).toContain("visibility: hidden");
   });
 
   it("pairs the SVG map with a readable side inspector", () => {
@@ -189,11 +177,12 @@ describe("homepage identity layout", () => {
 
   it("keeps graph marks and labels legible inside the narrower site", () => {
     const mark = css.match(/\.graph-node-mark\s*\{([^}]*)\}/)?.[1];
-    const label = css.match(/\.graph-node-label\s*\{([^}]*)\}/)?.[1];
+    const label = css.match(/\.graph-map-organic \.graph-node-label\s*\{([^}]*)\}/)?.[1];
 
     expect(mark).toContain("transform-box: fill-box");
     expect(mark).toContain("transform 160ms ease");
-    expect(label).toContain("font-size: 12px");
+    expect(label).toContain("font-size: 13px");
+    expect(label).toContain("font-family: var(--sans)");
   });
 
   it("contains variable inspector content inside a stable desktop graph stage", () => {
@@ -248,7 +237,8 @@ describe("homepage identity layout", () => {
       /\.graph-inspector-content\s*\{([^}]*)\}/
     )?.[1];
 
-    expect(content).toContain("view-transition-name: graph-inspector");
+    expect(content).not.toContain("view-transition-name");
+    expect(css).toMatch(/html\.graph-inspector-transition \.graph-inspector-content\s*\{[^}]*view-transition-name:\s*graph-inspector/);
     expect(css).toMatch(
       /::view-transition-old\(graph-inspector\)\s*\{[^}]*route-fade-out/
     );
@@ -306,7 +296,7 @@ describe("homepage identity layout", () => {
     const list = css.match(/\.public-entry-list\s*\{([^}]*)\}/)?.[1];
     const row = css.match(/\.public-entry-list article\s*\{([^}]*)\}/)?.[1];
     const title = css.match(
-      /\.public-entry-list h2 a\s*\{([^}]*)\}/
+      /\.public-entry-list \.entry-list-heading a\s*\{([^}]*)\}/
     )?.[1];
     const meta = css.match(/\.entry-meta-primary\s*\{([^}]*)\}/)?.[1];
 
@@ -338,22 +328,20 @@ describe("homepage identity layout", () => {
     expect(portraitLink).toContain("width: fit-content");
   });
 
-  it("uses one clock for the page, route, and shared titles", () => {
+  it("keeps the shell steady while pages settle and titles move together", () => {
     expect(css).toMatch(
-      /::view-transition-old\(root\)\s*\{[^}]*animation:\s*route-fade-out 250ms ease-out both/
+      /::view-transition-new\(root\)\s*\{[^}]*animation:\s*none/
     );
     expect(css).toMatch(
-      /::view-transition-new\(root\)\s*\{[^}]*animation:\s*route-fade-in 250ms ease-out both/
+      /::view-transition-old\(\.page-motion\)\s*\{[^}]*animation:\s*section-leave-left 220ms/
     );
     expect(css).toMatch(
-      /::view-transition-old\(\.route-crossfade\)\s*\{[^}]*animation:\s*route-fade-out 250ms ease-out both/
+      /::view-transition-new\(\.page-motion\)\s*\{[^}]*animation:\s*section-enter-right 440ms/
     );
     expect(css).toMatch(
-      /::view-transition-new\(\.route-crossfade\)\s*\{[^}]*animation:\s*route-fade-in 250ms ease-out both/
+      /::view-transition-group\(\.entry-title\),\s*::view-transition-group\(\.brand-mark\),\s*::view-transition-group\(connections-destination\),\s*::view-transition-group\(\.navigation-indicator\)\s*\{[^}]*animation-duration:\s*440ms/
     );
-    expect(css).toMatch(
-      /::view-transition-group\(\.entry-title\)\s*\{[^}]*animation-duration:\s*250ms[^}]*animation-timing-function:\s*ease-out/
-    );
+    expect(css).toMatch(/html\[data-navigation-input="keyboard"\]::view-transition-new\(\*\)\s*\{[^}]*animation-duration:\s*0s !important/);
     expect(css).not.toContain("site-header");
     expect(css).toMatch(
       /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*::view-transition-old\(\*\)[\s\S]*animation-duration:\s*0s !important/

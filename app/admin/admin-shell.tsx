@@ -11,11 +11,13 @@ type AdminTab =
   | "comments"
   | "analytics"
   | "profile"
+  | "pages"
   | "media";
 
 const tabs = [
-  { id: "entries", href: "/admin", label: "Entries" },
-  { id: "work", href: "/admin/work", label: "Work" },
+  { id: "entries", href: "/admin", label: "Writing" },
+  { id: "work", href: "/admin/work", label: "Projects" },
+  { id: "pages", href: "/admin/pages", label: "Pages" },
   { id: "graph", href: "/admin/graph", label: "Graph" },
   { id: "comments", href: "/admin/comments", label: "Comments" },
   { id: "analytics", href: "/admin/analytics", label: "Analytics" },
@@ -60,7 +62,8 @@ export function AdminShell({
     setBusy(true);
     setMessage("");
     try {
-      await authClient.signOut();
+      const result = await authClient.signOut();
+      if (result.error) throw new Error(result.error.message);
       window.location.assign("/admin");
     } catch {
       setMessage("Could not sign out. Try again.");
@@ -72,7 +75,7 @@ export function AdminShell({
     <div className="admin-shell">
       <header className="admin-header">
         <div>
-          <h1>Admin</h1>
+          <h1>Studio</h1>
           <p className="admin-meta">{description}</p>
         </div>
         <button type="button" onClick={() => void signOut()} disabled={busy}>
@@ -119,7 +122,7 @@ export function AdminAccessState({ state }: { state: AdminRouteState }) {
     const { missing, invalid } = state.configurationStatus;
     return (
       <AdminStatePanel>
-        <h1>Admin</h1>
+        <h1>Studio</h1>
         <h2>Admin configuration is incomplete</h2>
         <p>Set the following server environment variables before using the editor.</p>
         <ul>
@@ -135,10 +138,14 @@ export function AdminAccessState({ state }: { state: AdminRouteState }) {
     setBusy(true);
     setMessage("");
     try {
-      await authClient.signIn.social({
+      const result = await authClient.signIn.social({
         provider: "github",
-        callbackURL: window.location.pathname,
+        callbackURL: window.location.pathname + window.location.search,
       });
+      if (result.error) {
+        setMessage(result.error.message || "Could not start GitHub sign-in. Try again.");
+        setBusy(false);
+      }
     } catch {
       setMessage("Could not start GitHub sign-in. Try again.");
       setBusy(false);
@@ -149,7 +156,8 @@ export function AdminAccessState({ state }: { state: AdminRouteState }) {
     setBusy(true);
     setMessage("");
     try {
-      await authClient.signOut();
+      const result = await authClient.signOut();
+      if (result.error) throw new Error(result.error.message);
       window.location.assign("/admin");
     } catch {
       setMessage("Could not sign out. Try again.");
@@ -160,7 +168,7 @@ export function AdminAccessState({ state }: { state: AdminRouteState }) {
   if (state.mode === "signed-out") {
     return (
       <AdminStatePanel>
-        <h1>Admin</h1>
+        <h1>Studio</h1>
         <p>Only the configured GitHub owner can manage this site.</p>
         <button type="button" onClick={() => void signIn()} disabled={busy}>
           Sign in with GitHub
@@ -172,7 +180,7 @@ export function AdminAccessState({ state }: { state: AdminRouteState }) {
 
   return (
     <AdminStatePanel>
-      <h1>Admin</h1>
+      <h1>Studio</h1>
       <p>This GitHub account does not match the configured owner.</p>
       <button type="button" onClick={() => void signOut()} disabled={busy}>
         Sign out

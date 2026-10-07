@@ -12,10 +12,12 @@ vi.mock("next/link", () => ({
   default: ({
     children,
     href,
+    transitionTypes: _transitionTypes,
     ...props
   }: AnchorHTMLAttributes<HTMLAnchorElement> & {
     children: ReactNode;
     href: string;
+    transitionTypes?: string[];
   }) => (
     <a href={href} data-next-link="true" {...props}>
       {children}
@@ -30,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("site navigation", () => {
-  it("keeps the wordmark visible and exposes Home plus the four public sections", () => {
+  it("uses the wordmark for home and names the five public sections", () => {
     pathname = "/writing/example";
 
     const html = renderToStaticMarkup(<Nav />);
@@ -39,10 +41,10 @@ describe("site navigation", () => {
     expect(html).toContain(
       '<a href="/" data-next-link="true" class="wordmark">Pablo Pupo</a>'
     );
-    expect(html).toContain('<a href="/" data-next-link="true">Home</a>');
-    expect(html).toContain('<a href="/work" data-next-link="true">Work</a>');
+    expect(html).toContain('<a href="/accordo" data-next-link="true">Accordo</a>');
+    expect(html).toContain('<a href="/work" data-next-link="true">Engineering</a>');
     expect(html).toContain(
-      '<a href="/writing" data-next-link="true" aria-current="page">Writing</a>'
+      '<a href="/writing" data-next-link="true" aria-current="page">Writing<span class="nav-current-indicator" aria-hidden="true"></span></a>'
     );
     expect(html).toContain('<a href="/music" data-next-link="true">Music</a>');
     expect(html).toContain('<a href="/about" data-next-link="true">About</a>');
@@ -50,17 +52,12 @@ describe("site navigation", () => {
     expect(html).not.toContain("Contributions");
   });
 
-  it("marks Home current only on the homepage", () => {
+  it("marks Engineering current for project detail routes", () => {
+    pathname = "/work/gradus-ad-parnassum";
+    const html = renderToStaticMarkup(<Nav />);
+    expect(html).toContain('<a href="/work" data-next-link="true" aria-current="page">Engineering<span class="nav-current-indicator" aria-hidden="true"></span></a>');
     pathname = "/";
-    const homeHtml = renderToStaticMarkup(<Nav />);
-
-    pathname = "/writing";
-    const writingHtml = renderToStaticMarkup(<Nav />);
-
-    expect(homeHtml).toContain(
-      '<a href="/" data-next-link="true" aria-current="page">Home</a>'
-    );
-    expect(writingHtml).toContain('<a href="/" data-next-link="true">Home</a>');
+    expect(renderToStaticMarkup(<Nav />)).not.toContain('aria-current="page"');
   });
 
   it("provides an accessible inline-search toggle instead of a search-page link", () => {
@@ -89,8 +86,8 @@ describe("site navigation", () => {
 
     expect(html).not.toContain('data-next-link="true"');
     expect(html).toContain('<a href="/" class="wordmark">Pablo Pupo</a>');
-    expect(html).toContain('<a href="/">Home</a>');
-    expect(html).toContain('<a href="/work">Work</a>');
+    expect(html).toContain('<a href="/accordo">Accordo</a>');
+    expect(html).toContain('<a href="/work">Engineering</a>');
     expect(html).toContain('<a href="/writing">Writing</a>');
   });
 });

@@ -5,27 +5,34 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
 import {
   forceCollide,
+  forceCenter,
   forceLink,
   forceManyBody,
   forceSimulation,
   forceX,
   forceY,
 } from "d3-force";
+import { layoutGraphLabels } from "./graph-label-layout";
+import { graphStartPosition } from "./graph-start-layout";
+import GraphSymbol from "./graph-symbol";
 
 export type GraphMapNodeType = "concept" | "project" | "writing" | "music";
 
 export type GraphMapNode = {
   id: string;
   label: string;
+  shortLabel?: string;
   type: GraphMapNodeType;
   summary: string | null;
   href: string | null;
   pinned: boolean;
+  hub?: "engineering" | "music";
 };
 
 export type GraphMapEdge = {
@@ -58,6 +65,8 @@ type Direction = "left" | "right" | "up" | "down";
 type SimulationNode = PositionedGraphNode & {
   fx?: number | null;
   fy?: number | null;
+  vx?: number;
+  vy?: number;
 };
 
 type SimulationEdge = {
@@ -69,7 +78,6 @@ type SimulationEdge = {
 const WIDTH = 600;
 const HEIGHT = 340;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-
 export function compareCodeUnits(left: string, right: string) {
   return left === right ? 0 : left < right ? -1 : 1;
 }
@@ -84,6 +92,7 @@ function hash(value: string) {
 }
 
 function visibleNodeRadius(node: GraphMapNode) {
+  if (node.hub) return 11;
   if (node.type === "music") return 7;
   return node.type === "concept" ? 6 : 6.5;
 }
@@ -92,15 +101,15 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-function simulationStart(node: GraphMapNode, index: number) {
+function simulationStart(node: GraphMapNode, index: number, width: number, height: number) {
   const angle =
     index * GOLDEN_ANGLE + (hash(`${node.id}:angle`) / 0xffffffff) * 0.4;
   const radius =
     24 +
-    (hash(`${node.id}:radius`) / 0xffffffff) * Math.min(WIDTH, HEIGHT) * 0.34;
+    (hash(`${node.id}:radius`) / 0xffffffff) * Math.min(width, height) * 0.34;
   return {
-    x: WIDTH / 2 + Math.cos(angle) * radius,
-    y: HEIGHT / 2 + Math.sin(angle) * radius,
+    x: width / 2 + Math.cos(angle) * radius,
+    y: height / 2 + Math.sin(angle) * radius,
   };
 }
 
@@ -113,14 +122,61 @@ function orderedGraphEdges(edges: GraphMapEdge[]) {
   );
 }
 
-function graphSimulation(data: GraphMapData) {
+function graphSimulation(data: GraphMapData, width = WIDTH, height = HEIGHT, organic = false) {
+  const hubX = (node: GraphMapNode) => width * (node.hub === "engineering" ? (width < 400 ? 0.4 : 0.28) : node.hub === "music" ? (width < 400 ? 0.6 : 0.72) : 0.5);
+  const hubY = (node: GraphMapNode) => height * (node.hub === "engineering" ? (width < 400 ? 0.3 : 0.42) : node.hub === "music" ? (width < 400 ? 0.7 : 0.58) : 0.5);
   const nodes: SimulationNode[] = [...data.nodes]
     .sort((left, right) => compareCodeUnits(left.id, right.id))
-    .map((node, index) => ({ ...node, ...simulationStart(node, index) }));
+    .map((node, index) => ({ ...node, ...simulationStart(node, index, width, height) }));
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges = orderedGraphEdges(data.edges).filter(
     (edge) => nodeIds.has(edge.s) && nodeIds.has(edge.t)
   );
+  const hubs = [nodes.find((node) => node.hub === "engineering"), nodes.find((node) => node.hub === "music")];
+  const starts = new Map<string, { x: number; y: number }>();
+  if (organic && hubs.every(Boolean)) {
+    const neighbors = new Map(nodes.map((node) => [node.id, [] as string[]]));
+    for (const edge of edges) {
+      neighbors.get(edge.s)!.push(edge.t);
+      neighbors.get(edge.t)!.push(edge.s);
+    }
+    const distances = hubs.map((hub) => {
+      const distance = new Map([[hub!.id, 0]]);
+      const queue = [hub!.id];
+      for (let index = 0; index < queue.length; index++) {
+        const id = queue[index];
+        for (const neighbor of neighbors.get(id)!) if (!distance.has(neighbor)) {
+          distance.set(neighbor, distance.get(id)! + 1);
+          queue.push(neighbor);
+        }
+      }
+      return distance;
+    });
+    const groups: SimulationNode[][] = [[], [], []];
+    for (const node of nodes) {
+      if (node.hub) { node.x = hubX(node); node.y = hubY(node); continue; }
+      const engineering = distances[0].get(node.id) ?? Infinity;
+      const music = distances[1].get(node.id) ?? Infinity;
+      groups[engineering < music ? 0 : music < engineering ? 1 : 2].push(node);
+    }
+    // Seed neighbors near their area, then let the links and repulsion determine the layout.
+    // This avoids tangled starting positions without pinning projects to lanes.
+    groups.forEach((group, index) => group.forEach((node, position) => {
+      const angle = position / group.length * Math.PI * 2 + 0.6;
+      const centerX = index < 2 ? hubX(hubs[index]!) : width / 2;
+      const centerY = index < 2 ? hubY(hubs[index]!) : height / 2;
+      const radius = index < 2 ? 85 : 48;
+      node.x = centerX + Math.cos(angle) * radius;
+      node.y = centerY + Math.sin(angle) * radius;
+    }));
+    for (const node of nodes) {
+      const start = graphStartPosition(node, width, height);
+      if (start) {
+        starts.set(node.id, start);
+        Object.assign(node, start);
+      }
+    }
+  }
   const simulationEdges: SimulationEdge[] = edges.map((edge) => ({
     source: edge.s,
     target: edge.t,
@@ -131,7 +187,7 @@ function graphSimulation(data: GraphMapData) {
       "link",
       forceLink<SimulationNode, SimulationEdge>(simulationEdges)
         .id((node) => node.id)
-        .distance((edge) =>
+        .distance((edge) => organic ? (edge.kind === "semantic" ? 130 : 96) :
           edge.kind === "semantic" ? 104 : edge.kind === "link" ? 72 : 84
         )
         .strength((edge) => (edge.kind === "semantic" ? 0.2 : 0.5))
@@ -139,28 +195,51 @@ function graphSimulation(data: GraphMapData) {
     .force(
       "charge",
       forceManyBody<SimulationNode>().strength((node) =>
-        node.type === "concept" ? -150 : -220
+        organic ? -260 : node.type === "concept" ? -150 : -220
       )
     )
     .force(
       "collide",
-      forceCollide<SimulationNode>((node) => visibleNodeRadius(node) + 12)
+      forceCollide<SimulationNode>((node) => organic ? (node.hub ? 48 : 37) : visibleNodeRadius(node) + 12).iterations(organic ? 3 : 1)
     )
-    .force("x", forceX<SimulationNode>(WIDTH / 2).strength(0.04))
-    .force("y", forceY<SimulationNode>(HEIGHT / 2).strength(0.05));
-  return { nodes, simulation };
+    .force("x", forceX<SimulationNode>((node) => starts.get(node.id)?.x ?? (organic ? hubX(node) : width / 2)).strength((node) => starts.has(node.id) ? 0.12 : organic && node.hub ? 0.35 : width < 400 ? 0.14 : organic ? 0.025 : 0.04))
+    .force("y", forceY<SimulationNode>((node) => starts.get(node.id)?.y ?? (organic ? hubY(node) : height / 2)).strength((node) => starts.has(node.id) ? 0.12 : organic && node.hub ? 0.35 : width < 400 ? 0.025 : 0.05));
+  if (organic) {
+    simulation.velocityDecay(0.48)
+      .force("center", forceCenter<SimulationNode>(width / 2, height / 2).strength(0.08))
+      .force("bounds", () => {
+      // Keep the constellation in view without snapping nodes into rows or columns.
+      for (const node of nodes) {
+        const nextX = node.x + (node.vx ?? 0);
+        const nextY = node.y + (node.vy ?? 0);
+        node.vx = (node.vx ?? 0) + (clamp(nextX, 48, width - 48) - nextX) * 0.6;
+        node.vy = (node.vy ?? 0) + (clamp(nextY, 30, height - 46) - nextY) * 0.6;
+      }
+    });
+  }
+  return { nodes, simulation, starts };
 }
 
-export function layoutGraph(data: GraphMapData): PositionedGraphNode[] {
-  const { nodes, simulation } = graphSimulation(data);
+export function layoutGraph(data: GraphMapData, width = WIDTH, height = HEIGHT, organic = false): PositionedGraphNode[] {
+  const { nodes, simulation, starts } = graphSimulation(data, width, height, organic);
   simulation.stop();
+  // Hold the opening composition while any new, unplaced entries settle around
+  // it. These constraints are removed before the interactive map is created.
+  for (const node of nodes) {
+    const start = starts.get(node.id);
+    if (start) { node.fx = start.x; node.fy = start.y; }
+  }
   simulation.tick(280);
+  for (const node of nodes) {
+    if (starts.has(node.id)) { delete node.fx; delete node.fy; }
+  }
 
   return nodes
     .map((node) => ({
       ...node,
-      x: clamp(node.x, visibleNodeRadius(node), WIDTH - visibleNodeRadius(node)),
-      y: clamp(node.y, visibleNodeRadius(node), HEIGHT - visibleNodeRadius(node)),
+      // Browser and server trig can differ in the last decimal places.
+      x: Math.round(clamp(node.x, visibleNodeRadius(node), width - visibleNodeRadius(node)) * 1000) / 1000,
+      y: Math.round(clamp(node.y, visibleNodeRadius(node), height - visibleNodeRadius(node)) * 1000) / 1000,
     }))
     .sort((left, right) => compareCodeUnits(left.id, right.id));
 }
@@ -279,17 +358,17 @@ export function reduceGraphDrag(
   };
 }
 
-function positionedNodes(nodes: SimulationNode[]): PositionedGraphNode[] {
+function positionedNodes(nodes: SimulationNode[], width: number, height: number): PositionedGraphNode[] {
   return nodes
     .map((node) => {
       const radius = visibleNodeRadius(node);
-      node.x = clamp(node.x, radius, WIDTH - radius);
-      node.y = clamp(node.y, radius, HEIGHT - radius);
+      node.x = clamp(node.x, radius, width - radius);
+      node.y = clamp(node.y, radius, height - radius);
       if (node.fx !== null && node.fx !== undefined) {
-        node.fx = clamp(node.fx, radius, WIDTH - radius);
+        node.fx = clamp(node.fx, radius, width - radius);
       }
       if (node.fy !== null && node.fy !== undefined) {
-        node.fy = clamp(node.fy, radius, HEIGHT - radius);
+        node.fy = clamp(node.fy, radius, height - radius);
       }
       return { ...node };
     })
@@ -326,25 +405,9 @@ export function directionalGraphNode(
 }
 
 function nodeShape(node: PositionedGraphNode, scale: number) {
-  const style = { transform: `scale(${scale})` };
-  if (node.type === "music") {
-    return (
-      <path
-        className="graph-node-mark"
-        d={`M ${node.x} ${node.y - 7} L ${node.x + 7} ${node.y} L ${node.x} ${node.y + 7} L ${node.x - 7} ${node.y} Z`}
-        style={style}
-      />
-    );
-  }
-  return (
-    <circle
-      className="graph-node-mark"
-      cx={node.x}
-      cy={node.y}
-      r={node.type === "concept" ? 6 : 6.5}
-      style={style}
-    />
-  );
+  return <GraphSymbol type={node.type} x={node.x} y={node.y}
+    size={node.hub ? 10 : node.type === "concept" ? 4 : node.type === "music" ? 7 : node.type === "writing" ? 5.5 : 6.5}
+    className="graph-node-mark" style={{ transform: `scale(${scale})` }} />;
 }
 
 type GraphMapProps = {
@@ -353,7 +416,21 @@ type GraphMapProps = {
   onSelect: (id: string) => void;
   ariaLabel: string;
   connectingFromId?: string | null;
+  layout?: "force" | "organic";
+  hubStyle?: "rings" | "halo" | "names";
+  highlightedIds?: Set<string> | null;
+  compact?: boolean;
 };
+
+function subscribeToViewport(onChange: () => void) {
+  const query = window.matchMedia?.("(max-width: 520px)");
+  query?.addEventListener?.("change", onChange);
+  return () => query?.removeEventListener?.("change", onChange);
+}
+
+function isNarrowViewport() {
+  return window.matchMedia?.("(max-width: 520px)").matches ?? false;
+}
 
 export default function GraphMap({
   data,
@@ -361,10 +438,17 @@ export default function GraphMap({
   onSelect,
   ariaLabel,
   connectingFromId = null,
+  layout = "force",
+  hubStyle = "rings",
+  highlightedIds = null,
+  compact = false,
 }: GraphMapProps) {
+  const narrow = useSyncExternalStore(subscribeToViewport, isNarrowViewport, () => false);
+  const width = narrow ? 360 : WIDTH;
+  const height = layout === "organic" ? (narrow ? compact ? 440 : 620 : 420) : narrow ? 400 : HEIGHT;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const initialNodes = useMemo(() => layoutGraph(data), [data]);
+  const initialNodes = useMemo(() => layoutGraph(data, width, height, layout === "organic"), [data, width, height, layout]);
   const [nodes, setNodes] = useState(initialNodes);
   const simulationRef = useRef<ReturnType<typeof graphSimulation> | null>(null);
   const pointerIdRef = useRef<number | null>(null);
@@ -385,7 +469,7 @@ export default function GraphMap({
   );
 
   useEffect(() => {
-    const graph = graphSimulation(data);
+    const graph = graphSimulation(data, width, height, layout === "organic");
     const initialPositions = new Map(
       initialNodes.map((node) => [node.id, node])
     );
@@ -396,7 +480,7 @@ export default function GraphMap({
       node.y = position.y;
     }
     graph.simulation.stop();
-    graph.simulation.on("tick", () => setNodes(positionedNodes(graph.nodes)));
+    graph.simulation.on("tick", () => setNodes(positionedNodes(graph.nodes, width, height)));
     simulationRef.current = graph;
     setNodes(initialNodes);
 
@@ -404,11 +488,11 @@ export default function GraphMap({
       graph.simulation.stop();
       if (simulationRef.current === graph) simulationRef.current = null;
     };
-  }, [data, initialNodes]);
+  }, [data, initialNodes, width, height, layout]);
 
+  const labels = useMemo(() => layoutGraphLabels(nodes, width, height, layout === "organic" ? data.edges : []), [nodes, width, height, layout, data.edges]);
   const positions = new Map(nodes.map((node) => [node.id, node]));
   const neighbors = new Map<string, Set<string>>();
-  const degree = new Map<string, number>();
   for (const node of nodes) neighbors.set(node.id, new Set());
   const edges = orderedGraphEdges(data.edges).filter(
     (edge) => neighbors.has(edge.s) && neighbors.has(edge.t)
@@ -416,26 +500,14 @@ export default function GraphMap({
   for (const edge of edges) {
     neighbors.get(edge.s)?.add(edge.t);
     neighbors.get(edge.t)?.add(edge.s);
-    degree.set(edge.s, (degree.get(edge.s) ?? 0) + 1);
-    degree.set(edge.t, (degree.get(edge.t) ?? 0) + 1);
   }
-  const restLabelIds = new Set(
-    [...nodes]
-      .sort(
-        (left, right) =>
-          (degree.get(right.id) ?? 0) - (degree.get(left.id) ?? 0) ||
-          compareCodeUnits(left.label, right.label) ||
-          compareCodeUnits(left.id, right.id)
-      )
-      .slice(0, 5)
-      .map((node) => node.id)
-  );
   const focusId = resolveGraphFocus(hoveredId, focusedId, connectingFromId);
-  const neighborhood = focusId ? neighbors.get(focusId) ?? new Set() : new Set();
+  const emphasizedId = focusId ?? selectedId;
+  const neighborhood = emphasizedId ? neighbors.get(emphasizedId) ?? new Set() : new Set();
   const tabStop =
     selectedId && positions.has(selectedId)
       ? selectedId
-      : nodes[0]?.id ?? null;
+      : nodes.find((node) => node.hub === "engineering")?.id ?? nodes.find((node) => node.hub)?.id ?? nodes[0]?.id ?? null;
 
   function keyDown(
     event: KeyboardEvent<SVGGElement>,
@@ -466,19 +538,24 @@ export default function GraphMap({
 
   function pointerPosition(event: PointerEvent<SVGGElement>) {
     const svg = event.currentTarget.ownerSVGElement;
+    const matrix = svg?.getScreenCTM?.();
+    if (matrix) {
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      return { x: point.x, y: point.y };
+    }
     const bounds = svg?.getBoundingClientRect();
     if (!bounds || bounds.width === 0 || bounds.height === 0) {
       return { x: event.clientX, y: event.clientY };
     }
     return {
-      x: ((event.clientX - bounds.left) / bounds.width) * WIDTH,
-      y: ((event.clientY - bounds.top) / bounds.height) * HEIGHT,
+      x: ((event.clientX - bounds.left) / bounds.width) * width,
+      y: ((event.clientY - bounds.top) / bounds.height) * height,
     };
   }
 
   function refreshPositions() {
     const graph = simulationRef.current;
-    if (graph) setNodes(positionedNodes(graph.nodes));
+    if (graph) setNodes(positionedNodes(graph.nodes, width, height));
   }
 
   function applyDragEffect(effect: GraphDragEffect | null) {
@@ -491,6 +568,7 @@ export default function GraphMap({
     node.fx = effect.fixed ? effect.x : null;
     node.fy = effect.fixed ? effect.y : null;
     refreshPositions();
+    if (layout === "organic" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     if (effect.fixed) {
       graph.simulation.alpha(0.45).restart();
       return;
@@ -587,8 +665,8 @@ export default function GraphMap({
 
   return (
     <svg
-      className="graph-map"
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      className={`graph-map hub-style-${hubStyle}${layout === "organic" ? " graph-map-organic" : ""}`}
+      viewBox={`0 0 ${width} ${height}`}
       role="group"
       aria-label={ariaLabel}
     >
@@ -598,21 +676,22 @@ export default function GraphMap({
           const target = positions.get(edge.t);
           if (!source || !target) return null;
           const active =
-            focusId === source.id ||
-            focusId === target.id ||
+            emphasizedId === source.id ||
+            emphasizedId === target.id ||
             (connectingFromId === source.id && selectedId === target.id) ||
             (connectingFromId === target.id && selectedId === source.id);
-          return (
-            <line
-              key={edge.id}
-              className={[
+          const className = [
                 "graph-map-edge",
                 `is-${edge.kind}`,
                 active ? "is-active" : "",
-                focusId && !active ? "is-dimmed" : "",
+                ((layout === "organic" ? emphasizedId : focusId) && !active) || (highlightedIds && !highlightedIds.has(source.id) && !highlightedIds.has(target.id)) ? "is-dimmed" : "",
               ]
                 .filter(Boolean)
-                .join(" ")}
+                .join(" ");
+          return (
+            <line
+              key={edge.id}
+              className={className}
               x1={source.x}
               y1={source.y}
               x2={target.x}
@@ -623,14 +702,16 @@ export default function GraphMap({
       </g>
       <g className="graph-map-nodes">
         {nodes.map((node) => {
+          const label = labels.get(node.id)!;
           const selected = selectedId === node.id;
           const active = focusId === node.id;
           const connecting = connectingFromId === node.id;
           const neighboring = neighborhood.has(node.id);
-          const dimmed = Boolean(focusId && !active && !neighboring);
+          const dimmed = Boolean((focusId && !active && !neighboring) || (highlightedIds && !highlightedIds.has(node.id) && !active));
           const nodeScale = hoveredId === node.id || connecting ? 1.42 : 1.15;
           const showLabel =
-            restLabelIds.has(node.id) ||
+            layout === "organic" ||
+            node.type !== "concept" ||
             node.pinned ||
             active ||
             selected ||
@@ -641,8 +722,10 @@ export default function GraphMap({
               className={[
                 "graph-map-node",
                 `is-${node.type}`,
+                node.hub ? "is-hub" : "",
                 selected ? "is-selected" : "",
                 active ? "is-active" : "",
+                highlightedIds?.has(node.id) ? "is-search-match" : "",
                 neighboring ? "is-neighbor" : "",
                 dimmed ? "is-dimmed" : "",
                 connecting ? "is-connecting" : "",
@@ -684,15 +767,23 @@ export default function GraphMap({
                 cy={node.y}
                 r={22}
               />
+              {selected && (
+                <circle className="graph-node-ring" cx={node.x} cy={node.y} r={node.hub ? 18 : 13} />
+              )}
               {nodeShape(node, nodeScale)}
+              {node.hub && hubStyle === "halo" && <circle className="graph-hub-halo" cx={node.x} cy={node.y} r={19} />}
               {showLabel && (
                 <text
                   className="graph-node-label"
-                  x={node.x}
-                  y={node.y + 20}
-                  textAnchor="middle"
+                  x={node.x + label.dx}
+                  y={node.y + label.dy}
+                  aria-hidden="true"
                 >
-                  {node.label}
+                  {label.lines.map((line, index) => (
+                    <tspan key={index} x={node.x + label.dx} dy={index === 0 ? 0 : 16}>
+                      {line}{index < label.lines.length - 1 ? " " : ""}
+                    </tspan>
+                  ))}
                 </text>
               )}
             </g>

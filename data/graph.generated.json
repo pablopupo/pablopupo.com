@@ -4,43 +4,71 @@
    "id": "gradus-ad-parnassum",
    "label": "Gradus ad Parnassum",
    "type": "project",
-   "href": "https://github.com/pablopupo/gradus-ad-parnassum",
+   "href": "/work/gradus-ad-parnassum",
    "deg": 3
   },
   {
    "id": "kit-ai",
    "label": "Kit AI",
    "type": "project",
-   "href": "https://github.com/pablopupo/kit-ai",
+   "href": "/work/kit-ai",
    "deg": 3
   },
   {
    "id": "accordo",
    "label": "Accordo",
    "type": "project",
-   "href": null,
-   "deg": 2
+   "href": "/accordo",
+   "deg": 3
   },
   {
    "id": "nova",
    "label": "Nova",
    "type": "project",
-   "href": "https://github.com/pablopupo/Nova",
+   "href": "/work/nova",
    "deg": 1
+  },
+  {
+   "id": "beethoven-sonata-op-10-no-2",
+   "label": "Beethoven, Sonata Op. 10 No. 2",
+   "type": "music",
+   "href": "/music/beethoven-sonata-op-10-no-2",
+   "deg": 1
+  },
+  {
+   "id": "composition-in-e-flat-major",
+   "label": "Composition in E-flat major",
+   "type": "music",
+   "href": "/music/composition-in-e-flat-major",
+   "deg": 1
+  },
+  {
+   "id": "schumann-abegg-variations",
+   "label": "Schumann, Abegg Variations",
+   "type": "music",
+   "href": "/music/schumann-abegg-variations",
+   "deg": 1
+  },
+  {
+   "id": "why-im-building-accordo",
+   "label": "Why I’m building Accordo",
+   "type": "music",
+   "href": "/music/why-im-building-accordo",
+   "deg": 2
   },
   {
    "id": "music",
    "label": "Music",
    "type": "concept",
    "href": null,
-   "deg": 2
+   "deg": 6
   },
   {
    "id": "notation",
    "label": "Musical notation",
    "type": "concept",
    "href": null,
-   "deg": 1
+   "deg": 3
   },
   {
    "id": "retrieval",
@@ -116,6 +144,42 @@
    "s": "nova",
    "t": "payments",
    "kind": "tag"
+  },
+  {
+   "s": "beethoven-sonata-op-10-no-2",
+   "t": "music",
+   "kind": "tag"
+  },
+  {
+   "s": "composition-in-e-flat-major",
+   "t": "music",
+   "kind": "tag"
+  },
+  {
+   "s": "schumann-abegg-variations",
+   "t": "music",
+   "kind": "tag"
+  },
+  {
+   "s": "why-im-building-accordo",
+   "t": "music",
+   "kind": "tag"
+  },
+  {
+   "s": "why-im-building-accordo",
+   "t": "notation",
+   "kind": "semantic",
+   "terms": [
+    "music"
+   ]
+  },
+  {
+   "s": "accordo",
+   "t": "notation",
+   "kind": "semantic",
+   "terms": [
+    "music"
+   ]
   }
  ]
 }

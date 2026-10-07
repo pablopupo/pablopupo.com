@@ -2,6 +2,8 @@ import curatedGraph from "../data/graph.json";
 import { getDatabase } from "./db/client";
 import { createContentRepository } from "./db/repository";
 import type { PublicEntry, PublicProject } from "./public-content";
+import { publicProjectPath } from "./site";
+import { projectExcerpt } from "./editorial";
 
 export type PublicGraphNodeType =
   | "project"
@@ -17,6 +19,7 @@ export type PublicGraphNode = {
   href: string | null;
   pinned: boolean;
   deg: number;
+  hub?: "engineering" | "music";
 };
 
 export type PublicGraphEdge = {
@@ -44,6 +47,7 @@ type CuratedNode = {
   href: string | null;
   pinned?: boolean;
   tags?: string[];
+  text?: string;
 };
 
 type CuratedGraph = {
@@ -94,7 +98,7 @@ function nonempty(value: string | null | undefined) {
 }
 
 function projectHref(project: PublicProject) {
-  return `/work#${project.slug}`;
+  return publicProjectPath(project.slug);
 }
 
 function entryHref(entry: PublicEntry) {
@@ -162,8 +166,9 @@ export function buildPublicGraph(
     });
   }
 
-  function connectCurated(nodeId: string, slug: string) {
-    for (const conceptId of curatedNodes.get(slug)?.tags ?? []) {
+  function connectCurated(nodeId: string, slug: string, tags: string[] = []) {
+    const knownTags = tags.map((tag) => tag.toLowerCase()).filter((tag) => concepts.has(tag));
+    for (const conceptId of [...(curatedNodes.get(slug)?.tags ?? []), ...knownTags]) {
       addConcept(conceptId);
       const pair = [nodeId, conceptId].sort().join("~");
       if (nodeId === conceptId || edgeKeys.has(pair)) continue;
@@ -184,7 +189,7 @@ export function buildPublicGraph(
       id,
       label: project.title,
       type: "project",
-      summary: nonempty(project.summary) ?? nonempty(project.bodyMarkdown),
+      summary: nonempty(projectExcerpt(project)),
       href: projectHref(project),
       pinned: curated?.type === "project" ? (curated.pinned ?? false) : false,
     });
@@ -202,7 +207,7 @@ export function buildPublicGraph(
       href: entryHref(entry),
       pinned: curated?.type === entry.section ? (curated.pinned ?? false) : false,
     });
-    connectCurated(id, entry.slug);
+    connectCurated(id, entry.slug, entry.tags);
   }
 
   return withDegrees([...nodes.values()], edges);
@@ -235,7 +240,7 @@ export function mergePublicGraph(
     const type = project ? "project" : entry ? entry.section : stored.kind;
     const sourceLabel = project?.title ?? entry?.title ?? stored.label;
     const sourceSummary =
-      project?.summary ??
+      (project ? nonempty(projectExcerpt(project)) : null) ??
       entry?.summary ??
       nonempty(stored.body);
     const href = project

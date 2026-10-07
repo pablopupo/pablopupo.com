@@ -27,16 +27,26 @@ type AdminSettingsHandlers = ReturnType<typeof createAdminSettingsHandlers>;
 type AdminMediaHandlers = ReturnType<typeof createAdminMediaHandlers>;
 
 function revalidateAdminContent() {
+  revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/writing");
+  revalidatePath("/writing/[slug]", "page");
   revalidatePath("/music");
+  revalidatePath("/music/[slug]", "page");
+  revalidatePath("/music/series/[slug]", "page");
+  revalidatePath("/writing/series/[slug]", "page");
+  revalidatePath("/work/notes");
+  revalidatePath("/work");
+  revalidatePath("/work/[slug]", "page");
+  revalidatePath("/accordo");
+  revalidatePath("/search");
   revalidatePath("/rss.xml");
   revalidatePath("/sitemap.xml");
 }
 
 function revalidateProfile() {
-  revalidatePath("/");
-  revalidatePath("/about");
+  // The profile is read by shared navigation, metadata, and every public page.
+  revalidatePath("/", "layout");
   revalidatePath("/admin");
   revalidatePath("/sitemap.xml");
 }
@@ -44,6 +54,8 @@ function revalidateProfile() {
 function revalidateProjectContent() {
   revalidatePath("/");
   revalidatePath("/work");
+  revalidatePath("/work/[slug]", "page");
+  revalidatePath("/accordo");
   revalidatePath("/search");
   revalidatePath("/sitemap.xml");
 }

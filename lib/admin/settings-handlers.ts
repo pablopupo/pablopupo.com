@@ -1,25 +1,12 @@
 import { z } from "zod";
+import { PAGE_COPY_HEADINGS, PAGE_COPY_KEYS } from "../page-copy";
+import type { SettingsPatch } from "./profile-repository";
 
 type AdminAccess =
   | { status: "unconfigured" }
   | { status: "unauthenticated" }
   | { status: "forbidden" }
   | { status: "authorized"; userId: string };
-
-type SettingsPatch = {
-  siteTitle?: string;
-  headline?: string;
-  location?: string | null;
-  graduationOn?: string | null;
-  introMarkdown?: string;
-  aboutMarkdown?: string;
-  contactEmail?: string | null;
-  githubUrl?: string | null;
-  linkedinUrl?: string | null;
-  youtubeUrl?: string | null;
-  avatarMediaId?: string | null;
-  resumeMediaId?: string | null;
-};
 
 type AdminSettingsRepository = {
   getSettings: () => Promise<unknown | undefined>;
@@ -78,6 +65,9 @@ const settingsFields = z
     graduationOn: graduationDate,
     introMarkdown: z.string().max(10_000),
     aboutMarkdown: z.string().max(100_000),
+    pageCopy: z.partialRecord(z.enum(PAGE_COPY_KEYS), z.string().max(10_000))
+      .refine((value) => Object.keys(value).length > 0, "at least one page field is required")
+      .refine((value) => PAGE_COPY_HEADINGS.every((key) => value[key] === undefined || Boolean(value[key]?.trim())), "page headings cannot be empty"),
     contactEmail: nullableEmail,
     githubUrl: nullableHttpUrl,
     linkedinUrl: nullableHttpUrl,

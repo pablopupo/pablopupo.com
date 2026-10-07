@@ -32,6 +32,7 @@ function mountGraphMap(
   options: {
     selectedId?: string | null;
     connectingFromId?: string | null;
+    layout?: "force" | "organic";
     onSelect?: (id: string) => void;
   } = {}
 ) {
@@ -44,6 +45,7 @@ function mountGraphMap(
         data={graphData}
         selectedId={options.selectedId ?? null}
         connectingFromId={options.connectingFromId}
+        layout={options.layout}
         onSelect={options.onSelect ?? vi.fn()}
         ariaLabel="Editable knowledge map"
       />
@@ -215,6 +217,28 @@ const connectedLayoutData: GraphMapData = {
 };
 
 describe("graph map layout", () => {
+  it("keeps the organic layout stable under reordered content without grouping by type", () => {
+    const original = structuredClone(connectedLayoutData);
+    const arranged = layoutGraph(connectedLayoutData, 600, 420, true);
+    expect(layoutGraph({ nodes: [...connectedLayoutData.nodes].reverse(), edges: [...connectedLayoutData.edges].reverse() }, 600, 420, true)).toEqual(arranged);
+    const retagged = layoutGraph({ ...connectedLayoutData, nodes: connectedLayoutData.nodes.map((node) => ({ ...node, type: "writing" as const })) }, 600, 420, true);
+    expect(retagged.map(({ x, y }) => ({ x, y }))).toEqual(arranged.map(({ x, y }) => ({ x, y })));
+    expect(connectedLayoutData).toEqual(original);
+  });
+
+  it.each([[600, 420], [360, 500]])("leaves breathing room inside an organic %s by %s canvas", (width, height) => {
+    const nodes = layoutGraph(connectedLayoutData, width, height, true);
+    for (const node of nodes) {
+      expect(node.x).toBeGreaterThan(30);
+      expect(node.x).toBeLessThan(width - 30);
+      expect(node.y).toBeGreaterThan(20);
+      expect(node.y).toBeLessThan(height - 30);
+      for (const other of nodes.filter((candidate) => candidate.id !== node.id)) {
+        expect(Math.hypot(node.x - other.x, node.y - other.y)).toBeGreaterThan(65);
+      }
+    }
+  });
+
   it("moves identity nodes when their topology changes", () => {
     const bridge = new Map(layoutGraph(data).map((node) => [node.id, node]));
     const directIdentityLink = {
@@ -437,9 +461,9 @@ describe("mounted graph map interactions", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("releases a dragged node back to the simulation and clears suppression on cancel", async () => {
+  it.each(["force", "organic"] as const)("releases a dragged node back to the %s simulation and clears suppression on cancel", async (layout) => {
     const onSelect = vi.fn();
-    const mounted = mountGraphMap(data, { onSelect });
+    const mounted = mountGraphMap(data, { onSelect, layout });
     const node = graphNode(mounted, "gradus");
     const captured = new Set<number>();
     Object.assign(node, {
@@ -899,7 +923,7 @@ describe("graph map markup", () => {
     expect(html).toContain('tabindex="0" data-graph-node="applied-ai"');
   });
 
-  it("labels only the five highest-degree nodes plus pinned nodes until focus reveals direct neighbors", () => {
+  it("reveals related topics while keeping unrelated topic labels hidden", () => {
     const nodes = Array.from({ length: 8 }, (_, index) => ({
       id: `node:${index}`,
       label: `Node ${index}`,
@@ -933,6 +957,7 @@ describe("graph map markup", () => {
       "Node 2",
       "Node 3",
       "Node 4",
+      "Node 5",
       "Node 6",
     ]);
     expect(initialLabels).not.toContain("Node 7");

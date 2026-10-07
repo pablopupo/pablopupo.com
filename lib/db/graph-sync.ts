@@ -1,3 +1,5 @@
+import { publicProjectPath } from "../site";
+
 type ProjectGraphSource = {
   id: string;
   slug: string;
@@ -19,7 +21,7 @@ export function projectGraphSnapshot(project: ProjectGraphSource) {
     projectId: project.id,
     label: project.title,
     kind: "project" as const,
-    href: `/work#${project.slug}`,
+    href: publicProjectPath(project.slug),
     body: project.summary ?? "",
     origin: "automatic" as const,
   };

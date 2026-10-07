@@ -10,6 +10,9 @@ vi.mock("@/lib/search", async (importOriginal) => ({
   searchPublicContent: mocks.searchPublicContent,
 }));
 
+vi.mock("@/lib/public-content", () => ({ getPublicEntries: async () => [], getPublicProjects: async () => [] }));
+vi.mock("@/lib/public-graph", () => ({ getPublicGraph: async () => ({ nodes: [], edges: [] }) }));
+
 beforeEach(() => {
   vi.resetModules();
   mocks.searchPublicContent.mockReset();
@@ -51,9 +54,10 @@ describe("search page", () => {
     expect(html).toContain('method="get"');
     expect(html).toContain('name="q"');
     expect(html).toContain('maxLength="80"');
-    expect(html).toContain("Search public writing, music, and work.");
-    expect(html).toContain('class="public-index reading-shell"');
-    expect(html).toContain('class="page-header"');
+    expect(html).toContain("Choose a point or type a search.");
+    expect(html).toContain('class="search-workspace"');
+    expect(html).toContain('class="editorial-page search-page"');
+    expect(html).toContain('class="editorial-header"');
   });
 
   it("renders normalized results with public links", async () => {
@@ -81,10 +85,10 @@ describe("search page", () => {
     );
 
     expect(mocks.searchPublicContent).toHaveBeenCalledWith("Applied AI");
-    expect(html).toContain("1 result for “Applied AI”");
+    expect(html).toContain("1 result.");
     expect(html).toContain('href="/writing/retrieval-notes"');
     expect(html).toContain("Notes on retrieval quality.");
-    expect(html).toContain('dateTime="2026-07-20T12:00:00.000Z"');
+    expect(html).not.toContain("Published Jul");
   });
 
   it("shows bounded-query validation without presenting results", async () => {

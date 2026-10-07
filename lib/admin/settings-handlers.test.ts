@@ -94,6 +94,10 @@ describe("admin settings handlers", () => {
   });
 
   it.each([
+    [{ expectedVersion: 1, settings: { pageCopy: {} } }, "empty page changes"],
+    [{ expectedVersion: 1, settings: { pageCopy: { unknown: "text" } } }, "unknown page fields"],
+    [{ expectedVersion: 1, settings: { pageCopy: { musicIntro: "x".repeat(10_001) } } }, "oversized page text"],
+    [{ expectedVersion: 1, settings: { pageCopy: { accordoTitle: "  " } } }, "blank page headings"],
     [{ expectedVersion: 1, settings: {} }, "an empty patch"],
     [{ expectedVersion: 1, settings: { siteTitle: "" } }, "an empty title"],
     [{ expectedVersion: 1, settings: { headline: "x".repeat(161) } }, "a long headline"],

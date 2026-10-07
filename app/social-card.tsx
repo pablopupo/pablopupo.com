@@ -9,9 +9,9 @@ export function SocialCard({ profile }: { profile: PublicProfile }) {
         display: "flex",
         width: "100%",
         height: "100%",
-        background: "#fbfcfc",
-        color: "#17212b",
-        borderTop: "14px solid #245ea8",
+        background: "#ffffff",
+        color: "#171717",
+        borderTop: "14px solid #171717",
         fontFamily: "Georgia, serif",
       }}
     >
@@ -27,7 +27,7 @@ export function SocialCard({ profile }: { profile: PublicProfile }) {
         <div
           style={{
             display: "flex",
-            color: "#245ea8",
+            color: "#171717",
             fontFamily: "Arial, sans-serif",
             fontSize: 22,
             fontWeight: 700,
@@ -63,7 +63,7 @@ export function SocialCard({ profile }: { profile: PublicProfile }) {
           style={{
             display: "flex",
             marginTop: 34,
-            color: "#4c5c69",
+            color: "#555555",
             fontFamily: "Arial, sans-serif",
             fontSize: 23,
           }}
@@ -75,7 +75,7 @@ export function SocialCard({ profile }: { profile: PublicProfile }) {
             style={{
               display: "flex",
               marginTop: 18,
-              color: "#6a7883",
+              color: "#666666",
               fontFamily: "Arial, sans-serif",
               fontSize: 20,
             }}

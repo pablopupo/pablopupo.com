@@ -156,8 +156,8 @@ function legacyEntry(post: Post): PublicEntry {
   return {
     id: null,
     slug: post.slug,
-    kind: "essay",
-    section: post.tags.some((tag) => tag.toLowerCase() === "music")
+    kind: post.performance ? "performance" : "essay",
+    section: post.performance || post.tags.some((tag) => tag.toLowerCase() === "music")
       ? "music"
       : "writing",
     tags: post.tags,
@@ -169,7 +169,7 @@ function legacyEntry(post: Post): PublicEntry {
       `Legacy entry ${post.slug}`
     ),
     readMinutes: post.readMinutes,
-    performance: null,
+    performance: post.performance ?? null,
   };
 }
 

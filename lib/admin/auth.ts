@@ -170,10 +170,15 @@ export function hasSameOrigin(request: Request, configuredUrl: string) {
   if (!origin) return false;
 
   try {
-    return (
-      new URL(origin).origin === new URL(request.url).origin &&
-      new URL(origin).origin === new URL(configuredUrl).origin
-    );
+    const configured = new URL(configuredUrl);
+    if (new URL(origin).origin !== configured.origin) return false;
+    // Next can build request.url with its internal localhost address. The Host
+    // header retains the address used by the browser. Both it and Origin must
+    // match our fixed configuration; forwarded host headers are not trusted.
+    const host = request.headers.get("host");
+    return host !== null
+      ? host.toLowerCase() === configured.host.toLowerCase()
+      : new URL(request.url).origin === configured.origin;
   } catch {
     return false;
   }

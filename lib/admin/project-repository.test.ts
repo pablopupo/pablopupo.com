@@ -351,7 +351,7 @@ describe("admin project repository", () => {
         key: `project:${created.id}`,
         label: "Living map project",
         kind: "project",
-        href: "/work#living-map-project",
+        href: "/work/living-map-project",
         body: "The first graph summary.",
       },
     ]);
@@ -393,7 +393,7 @@ describe("admin project repository", () => {
       {
         key: `project:${created.id}`,
         label: "Renamed map project",
-        href: "/work#renamed-map-project",
+        href: "/work/renamed-map-project",
         body: "The updated graph summary.",
       },
     ]);

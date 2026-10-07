@@ -3,6 +3,8 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { getDatabase } from "./db/client";
 import { media, siteSettings } from "./db/schema";
 import type * as schema from "./db/schema";
+import { DEFAULT_PROFILE_ASSETS } from "./profile-assets";
+import { resolvePageCopy, type PageCopy, type PageCopyPatch } from "./page-copy";
 
 export type PublicProfile = {
   siteTitle: string;
@@ -11,6 +13,7 @@ export type PublicProfile = {
   graduationOn: string | null;
   introMarkdown: string;
   aboutMarkdown: string;
+  pageCopy: PageCopy;
   contactEmail: string | null;
   githubUrl: string | null;
   linkedinUrl: string | null;
@@ -33,6 +36,7 @@ export type PublicProfileSettingsRecord = {
   graduationOn: string | null;
   introMarkdown: string;
   aboutMarkdown: string;
+  pageCopy?: PageCopyPatch;
   contactEmail: string | null;
   githubUrl: string | null;
   linkedinUrl: string | null;
@@ -52,16 +56,15 @@ export const DEFAULT_PUBLIC_PROFILE: Readonly<PublicProfile> = Object.freeze({
   location: "Miami, Florida",
   graduationOn: "2026-12-01",
   introMarkdown:
-    "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
+    "AI engineer at Handtevy. Classical pianist.  \nStudying computer science at the University of Florida.",
   aboutMarkdown:
-    "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
+    "I’m an AI engineer at Handtevy and a computer science student at the University of Florida. I build software and AI systems, and write about my [engineering work](/work) here.\n\nI also play piano and compose. I share [recordings](/music) alongside notes on the music I’m playing and listening to.\n\nI’m building [Accordo](/accordo) to connect musicians with one another and with opportunities.\n\nU.S. DoD Secret Clearance Eligibility Granted.",
   contactEmail: "pablofpupo23@gmail.com",
   githubUrl: "https://github.com/pablopupo",
   linkedinUrl: "https://linkedin.com/in/pablopupo",
-  youtubeUrl: null,
-  portraitUrl: "/media/pablo-pupo-portrait.jpg",
-  portraitAlt: "Pablo Pupo smiling outside at the University of Florida",
-  resumeUrl: "/Pablo-Pupo-Resume.pdf",
+  youtubeUrl: "https://www.youtube.com/@pablopupo4688",
+  ...DEFAULT_PROFILE_ASSETS,
+  pageCopy: resolvePageCopy(),
 });
 
 function requiredText(value: string, fallback: string) {
@@ -93,6 +96,7 @@ function resolveProfile(record: PublicProfileSettingsRecord): PublicProfile {
     graduationOn: record.graduationOn,
     introMarkdown: record.introMarkdown,
     aboutMarkdown: record.aboutMarkdown,
+    pageCopy: resolvePageCopy(record.pageCopy, record.headline || DEFAULT_PUBLIC_PROFILE.headline),
     contactEmail: record.contactEmail,
     githubUrl: record.githubUrl,
     linkedinUrl: record.linkedinUrl,
@@ -134,6 +138,7 @@ export function createPublicProfileRepository<
           graduationOn: siteSettings.graduationOn,
           introMarkdown: siteSettings.introMarkdown,
           aboutMarkdown: siteSettings.aboutMarkdown,
+          pageCopy: siteSettings.pageCopy,
           contactEmail: siteSettings.contactEmail,
           githubUrl: siteSettings.githubUrl,
           linkedinUrl: siteSettings.linkedinUrl,
@@ -171,6 +176,7 @@ export function createPublicProfileRepository<
         graduationOn: settings.graduationOn,
         introMarkdown: settings.introMarkdown,
         aboutMarkdown: settings.aboutMarkdown,
+        pageCopy: settings.pageCopy,
         contactEmail: settings.contactEmail,
         githubUrl: settings.githubUrl,
         linkedinUrl: settings.linkedinUrl,

@@ -127,10 +127,11 @@ describe("public content search", () => {
       results: [
         {
           type: "project",
+          kind: "Project",
           title: "C++ [AI] parser",
           summary: "A literal-pattern parser.",
-          href: "/work#parser",
-          section: "Work",
+          href: "/work/parser",
+          section: "Engineering",
           publishedAt,
         },
       ],
@@ -166,7 +167,7 @@ describe("public content search", () => {
 
     expect(retrieval.results.map((result) => result.href)).toEqual([
       "/writing/retrieval-notes",
-      "/work#gradus",
+      "/work/gradus",
     ]);
     expect(piano.results).toMatchObject([
       {
@@ -220,5 +221,87 @@ describe("public content search", () => {
     ).resolves.toMatchObject({
       results: [{ summary: "Compare <T> values before deployment." }],
     });
+  });
+
+  it.each(["beeth", "beethovan", "beetohven", "Beethoven sonata", "sonata by Beethoven"])("finds a recording for %s", async (query) => {
+    const response = await searchPublicContent(query, {
+      getEntries: async () => [entry({ slug: "beethoven", section: "music", title: "Beethoven, Sonata Op. 10 No. 2", tags: ["piano"] })],
+      getProjects: async () => [],
+    });
+    expect(response.results.map((result) => result.href)).toEqual(["/music/beethoven"]);
+  });
+
+  it.each(["kitai", "Kit-AI", "artificial intelligence", "AI kit"])("finds a project for %s", async (query) => {
+    const response = await searchPublicContent(query, {
+      getEntries: async () => [],
+      getProjects: async () => [project({ slug: "kit-ai", title: "Kit AI" })],
+    });
+    expect(response.results.map((result) => result.href)).toEqual(["/work/kit-ai"]);
+  });
+
+  it("matches accents, swapped letters, and recording vocabulary in published metadata", async () => {
+    const dependencies = {
+      getEntries: async () => [{ ...entry({ section: "music", title: "A short piece", tags: ["piano"] }), kind: "performance" as const, performance: {
+        workTitle: "Étude", composer: "Frédéric Chopin", venue: "UF School of Music", performedAt: null, youtubeUrl: "", notesMarkdown: null,
+      } }],
+      getProjects: async () => [],
+    };
+    for (const query of ["etude", "frederic", "pianist performance", "piano recordings", "chpoin recital"]) {
+      expect((await searchPublicContent(query, dependencies)).results).toHaveLength(1);
+    }
+  });
+
+  it("ranks exact titles before prefixes and spelling corrections", async () => {
+    const response = await searchPublicContent("Beethoven", {
+      getEntries: async () => [
+        entry({ slug: "typo", title: "Beethven" }),
+        entry({ slug: "prefix", title: "Beethoven studies" }),
+        entry({ slug: "exact", title: "Beethoven" }),
+      ],
+      getProjects: async () => [],
+    });
+    expect(response.results.map((result) => result.href)).toEqual(["/writing/exact", "/writing/prefix", "/writing/typo"]);
+  });
+
+  it("does not expand short acronyms into unrelated words or return everything for filler", async () => {
+    const dependencies = {
+      getEntries: async () => [entry({ title: "A chair at the piano", summary: "Practice", bodyMarkdown: "UI, painting, first aid, and the aim of playing airy music.", tags: [] })],
+      getProjects: async () => [],
+    };
+    for (const query of ["AI", "the and", "[]", "piano spaceship", "zzzzzzzz"]) {
+      expect((await searchPublicContent(query, dependencies)).results).toEqual([]);
+    }
+  });
+
+  it("finds AI work described as retrieval or RAG, with exact titles first", async () => {
+    const response = await searchPublicContent("AI", {
+      getEntries: async () => [entry({ title: "Why I’m building Accordo", summary: "Connecting musicians.", bodyMarkdown: "My aim is to connect musicians.", tags: [] })],
+      getProjects: async () => [
+        project({ slug: "gradus", title: "Gradus ad Parnassum", summary: "Retrieval over musical notation.", technologies: ["RAG"] }),
+        project({ slug: "kit-ai", title: "Kit AI", summary: "On-device assistance." }),
+        project({ slug: "nova", title: "Nova", summary: "QR payments.", bodyMarkdown: "An invoicing app.", technologies: ["Solana"] }),
+      ],
+    });
+    expect(response.results.map((result) => result.href)).toEqual(["/work/kit-ai", "/work/gradus"]);
+  });
+
+  it("searches published graph relationships without spreading into unrelated projects", async () => {
+    const response = await searchPublicContent("orchestration", {
+      getEntries: async () => [],
+      getProjects: async () => [project({ slug: "gradus", title: "Gradus" }), project({ slug: "nova", title: "Nova" })],
+      getGraph: async () => ({ nodes: [
+        { id: "gradus", label: "Gradus", type: "project", href: "/work/gradus", summary: null, pinned: false, deg: 1 },
+        { id: "topic", label: "Orchestration", type: "concept", href: null, summary: null, pinned: false, deg: 1 },
+      ], edges: [{ id: "gradus-topic", s: "gradus", t: "topic", kind: "tag" }] }),
+    });
+    expect(response.results.map((result) => result.href)).toEqual(["/work/gradus"]);
+  });
+
+  it("shows the matching paragraph when the description does not explain the result", async () => {
+    const response = await searchPublicContent("AI", {
+      getEntries: async () => [entry({ summary: "Connecting musicians.", bodyMarkdown: "## Background\n\nConnecting musicians.\n\nI am exploring AI tools for musicians.", tags: [] })],
+      getProjects: async () => [],
+    });
+    expect(response.results[0].summary).toBe("I am exploring AI tools for musicians.");
   });
 });

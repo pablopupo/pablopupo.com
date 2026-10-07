@@ -2,6 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { PublicEntry } from "@/lib/public-content";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ back: vi.fn() }),
+  usePathname: () => "/writing/retrieval-notes",
+}));
+
 vi.mock("./comments", () => ({
   default: ({ entryId }: { entryId: string }) => (
     <aside data-comments-entry={entryId}>Comments</aside>

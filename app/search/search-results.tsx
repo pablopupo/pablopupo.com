@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/page-link";
 import type { SearchResponse } from "@/lib/search";
 
 function formatSearchDate(value: string) {
@@ -24,7 +24,7 @@ export function SearchResults({ response }: { response: SearchResponse }) {
     );
   }
   if (response.results.length === 0) {
-    return <p className="search-message">No results for “{response.query}”.</p>;
+    return <p className="search-message">No results for “{response.query}”. Try a project, composer, or topic.</p>;
   }
 
   const label = `${response.results.length} ${
@@ -36,17 +36,17 @@ export function SearchResults({ response }: { response: SearchResponse }) {
       <ol>
         {response.results.map((result) => (
           <li key={`${result.type}:${result.href}`}>
+            <h3>
+              <Link href={result.href}>{result.title}</Link>
+            </h3>
             <p className="search-result-meta">
               <span>{result.section}</span>
               <span aria-hidden="true"> · </span>
               <time dateTime={result.publishedAt}>
-                {formatSearchDate(result.publishedAt)}
+                Published {formatSearchDate(result.publishedAt)}
               </time>
             </p>
-            <h3>
-              <Link href={result.href}>{result.title}</Link>
-            </h3>
-            {result.summary ? <p>{result.summary}</p> : null}
+            {result.summary ? <p className="search-result-summary">{result.summary}</p> : null}
           </li>
         ))}
       </ol>

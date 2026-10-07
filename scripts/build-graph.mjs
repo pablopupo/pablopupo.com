@@ -60,8 +60,8 @@ function readPosts() {
       return {
         id: f.replace(/\.mdx$/, ""),
         label: data.title || f.replace(/\.mdx$/, ""),
-        type: "writing",
-        href: `/writing/${f.replace(/\.mdx$/, "")}`,
+        type: data.kind === "performance" || data.tags?.some?.((tag) => tag.toLowerCase() === "music") ? "music" : "writing",
+        href: `/${data.kind === "performance" || data.tags?.some?.((tag) => tag.toLowerCase() === "music") ? "music" : "writing"}/${f.replace(/\.mdx$/, "")}`,
         text: `${data.title || ""} ${data.description || ""} ${body.slice(0, 2000)}`,
         tags: Array.isArray(data.tags) ? data.tags : [],
         wikilinks,

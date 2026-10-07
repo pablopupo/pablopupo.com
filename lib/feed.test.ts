@@ -24,6 +24,13 @@ const entries = [
 ];
 
 describe("RSS feed", () => {
+  it("includes the readable series name without internal ordering tags", () => {
+    const xml = createRssFeed([{ ...entries[0], tags: ["piano", "series:Weekly recordings", "part:2"] }], DEFAULT_PUBLIC_PROFILE);
+    expect(xml).toContain("<category>Weekly recordings</category>");
+    expect(xml).not.toContain("series:");
+    expect(xml).not.toContain("part:2");
+  });
+
   it("publishes correct channel metadata and every public section", () => {
     const xml = createRssFeed(entries, DEFAULT_PUBLIC_PROFILE);
 

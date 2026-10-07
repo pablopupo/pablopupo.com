@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     {
       ...response,
       total,
-      results: response.results.slice(0, 5),
+      results: new URL(request.url).searchParams.get("all") === "1" ? response.results : response.results.slice(0, 5),
     },
     {
       headers: {

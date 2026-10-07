@@ -204,6 +204,10 @@ export const siteSettings = pgTable(
     graduationOn: date("graduation_on"),
     introMarkdown: text("intro_markdown").notNull(),
     aboutMarkdown: text("about_markdown").default("").notNull(),
+    pageCopy: jsonb("page_copy")
+      .$type<import("../page-copy").PageCopyPatch>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
     contactEmail: text("contact_email"),
     githubUrl: text("github_url"),
     linkedinUrl: text("linkedin_url"),

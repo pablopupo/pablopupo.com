@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import Link from "next/link";
 import { cache } from "react";
 import PageViewTracker from "@/components/page-view-tracker";
 import VercelAnalytics from "@/components/vercel-analytics";
 import Nav from "./nav";
+import ProfileLinks from "@/components/profile-links";
 import RouteTransition from "./route-transition";
 import { createRootMetadata } from "@/lib/metadata";
 import { getPublicProfile } from "@/lib/public-profile";
 import { createSiteIdentity, serializeJsonLd } from "@/lib/site";
 import { themeBootstrapScript } from "./theme";
 import "./globals.css";
+import { PlaybackProvider, PersistentPlayer } from "@/components/playback-provider";
+import { NavigationHistoryProvider } from "@/components/navigation-history";
 
 const newsreader = localFont({
   src: [
@@ -55,24 +57,19 @@ export default async function RootLayout({
         <a className="skip-link" href="#main-content">
           Skip to content
         </a>
-        <header>
-          <Nav />
-        </header>
-        <main id="main-content">
-          <RouteTransition>{children}</RouteTransition>
-        </main>
-        <footer>
-          {profile.githubUrl ? <a href={profile.githubUrl}>GitHub</a> : null}
-          {profile.linkedinUrl ? (
-            <a href={profile.linkedinUrl}>LinkedIn</a>
-          ) : null}
-          {profile.youtubeUrl ? <a href={profile.youtubeUrl}>YouTube</a> : null}
-          <Link href="/resume">Resume</Link>
-          {profile.contactEmail ? (
-            <a href={`mailto:${profile.contactEmail}`}>Email</a>
-          ) : null}
-          <Link href="/rss.xml">RSS</Link>
-        </footer>
+        <NavigationHistoryProvider><PlaybackProvider>
+          <header>
+            <Nav />
+          </header>
+          <main id="main-content">
+            <PersistentPlayer />
+            <RouteTransition>{children}</RouteTransition>
+          </main>
+          <footer className="site-footer">
+            <p className="site-footer-credit">© {new Date().getUTCFullYear()} {profile.siteTitle}</p>
+            <ProfileLinks profile={profile} label="Footer links" />
+          </footer>
+        </PlaybackProvider></NavigationHistoryProvider>
         <PageViewTracker />
         <VercelAnalytics />
       </body>

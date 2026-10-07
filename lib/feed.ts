@@ -1,4 +1,5 @@
 import type { PublicProfile } from "./public-profile";
+import { entrySeries, visibleEntryTags } from "./series";
 import { absoluteSiteUrl, createProfileDescription } from "./site";
 
 type FeedEntry = {
@@ -46,9 +47,11 @@ function entryUrl(entry: FeedEntry) {
 
 function itemXml(entry: FeedEntry) {
   const url = entryUrl(entry);
+  const series = entrySeries(entry);
   const categories = [
     entry.section === "music" ? "Music" : "Writing",
-    ...entry.tags,
+    ...visibleEntryTags(entry.tags),
+    ...(series ? [series.title] : []),
   ]
     .map((category) => `      <category>${escapeXml(category)}</category>`)
     .join("\n");

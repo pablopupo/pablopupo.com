@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
+import { resolvePageCopy } from "./page-copy";
 
 const approvedProfile = {
+  pageCopy: resolvePageCopy(),
   siteTitle: "Pablo Pupo",
   headline: "AI Engineer at Handtevy",
   location: "Miami, Florida",
   graduationOn: "2026-12-01",
   introMarkdown:
-    "CS student at UF. AI engineer at Handtevy. Classical pianist and music enthusiast.",
+    "AI engineer at Handtevy. Classical pianist.  \nStudying computer science at the University of Florida.",
   aboutMarkdown:
-    "I study computer science at the University of Florida and build applied AI systems, with a focus on document intelligence, retrieval, and evaluation. I write technical notes about what I learn. I’m also a classical pianist, and I share performances and writing about music here.",
+    "I’m an AI engineer at Handtevy and a computer science student at the University of Florida. I build software and AI systems, and write about my [engineering work](/work) here.\n\nI also play piano and compose. I share [recordings](/music) alongside notes on the music I’m playing and listening to.\n\nI’m building [Accordo](/accordo) to connect musicians with one another and with opportunities.\n\nU.S. DoD Secret Clearance Eligibility Granted.",
   contactEmail: "pablofpupo23@gmail.com",
   githubUrl: "https://github.com/pablopupo",
   linkedinUrl: "https://linkedin.com/in/pablopupo",
-  youtubeUrl: null,
+  youtubeUrl: "https://www.youtube.com/@pablopupo4688",
   portraitUrl: "/media/pablo-pupo-portrait.jpg",
   portraitAlt: "Pablo Pupo smiling outside at the University of Florida",
   resumeUrl: "/Pablo-Pupo-Resume.pdf",
@@ -80,6 +82,7 @@ describe("public profile reader", () => {
     const { reader } = await setup("postgres://configured", readSettings);
 
     await expect(reader.getProfile()).resolves.toEqual({
+      pageCopy: resolvePageCopy(undefined, "Applied AI Engineer"),
       siteTitle: "Pablo's Notes",
       headline: "Applied AI Engineer",
       location: "Gainesville, Florida",
@@ -122,6 +125,7 @@ describe("public profile reader", () => {
       contactEmail: null,
       githubUrl: null,
       linkedinUrl: null,
+      youtubeUrl: null,
     });
   });
 

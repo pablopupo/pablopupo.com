@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
+import CopyEmail from "@/components/copy-email";
 import MarkdownContent from "@/components/markdown-content";
 import { createPageMetadata } from "@/lib/metadata";
 import { getPublicProfile } from "@/lib/public-profile";
@@ -29,51 +30,34 @@ export default async function About() {
   const graduation = graduationLabel(profile.graduationOn);
 
   return (
-    <article className="about-page reading-shell">
-      <header className="page-header">
-        <p className="eyebrow">{profile.siteTitle}</p>
+    <article className="editorial-page about-story">
+      <header className="editorial-header about-header">
         <h1>About</h1>
-        <p className="about-headline">{profile.headline}</p>
+        <a href="/resume" target="_blank" rel="noopener noreferrer">View resume <span aria-hidden="true">↗</span></a>
       </header>
-
-      <section aria-labelledby="applied-ai-title">
-        <h2 id="applied-ai-title">Applied AI</h2>
-        <MarkdownContent markdown={profile.aboutMarkdown} />
-        <p>
-          I am learning more about AI systems, especially inference, serving,
-          runtime behavior, performance, reliability, and evaluation. I
-          publish notes here as I turn that study into working systems.
-        </p>
-      </section>
-
-      <section aria-labelledby="music-about-title">
-        <h2 id="music-about-title">Music</h2>
-        <p>
-          I am a classical pianist. I share piano performances, practice notes,
-          and writing about the music I study.
-        </p>
-      </section>
-
-      <section aria-labelledby="education-title">
-        <h2 id="education-title">Education</h2>
-        <p>
-          I study computer science at the University of Florida
-          {graduation ? ` and expect to graduate in ${graduation}` : ""}.
-          {profile.location ? ` I am based in ${profile.location}.` : ""}
-        </p>
-      </section>
-
-      <section aria-labelledby="contact-title">
-        <h2 id="contact-title">Contact</h2>
-        <p className="profile-links">
-          <Link href="/resume">Resume</Link>
-          {profile.contactEmail && (
-            <a href={`mailto:${profile.contactEmail}`}>Email</a>
-          )}
-          {profile.githubUrl && <a href={profile.githubUrl}>GitHub</a>}
-          {profile.linkedinUrl && <a href={profile.linkedinUrl}>LinkedIn</a>}
-        </p>
-      </section>
+      <div className="about-content">
+        <figure className="about-portrait">
+          <Image src={profile.portraitUrl} alt={profile.portraitAlt} width={480} height={600} sizes="(max-width: 600px) 160px, 240px" unoptimized={profile.portraitUrl.startsWith("http")} />
+          <figcaption><span>{profile.siteTitle}</span>{profile.location && <span>{profile.location}</span>}</figcaption>
+        </figure>
+        <div className="about-biography">
+          <MarkdownContent markdown={profile.aboutMarkdown} />
+        </div>
+      </div>
+      <div className="about-details">
+        <section aria-labelledby="about-education">
+          <h2 id="about-education">Education</h2>
+          {profile.pageCopy.aboutSchool && <p>{profile.pageCopy.aboutSchool}</p>}
+          <p className="about-detail-note">{profile.pageCopy.aboutStudy}{graduation ? <><br />Expected graduation: {graduation}</> : null}</p>
+        </section>
+        {(profile.linkedinUrl || profile.contactEmail) && <section aria-labelledby="about-contact">
+          <h2 id="about-contact">Say hello</h2>
+          <div className="about-contact-links">
+            {profile.linkedinUrl && <a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a>}
+            {profile.contactEmail && <CopyEmail email={profile.contactEmail} label="Copy email" />}
+          </div>
+        </section>}
+      </div>
     </article>
   );
 }

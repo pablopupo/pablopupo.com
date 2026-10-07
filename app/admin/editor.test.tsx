@@ -246,7 +246,7 @@ describe("admin editor states", () => {
     const html = renderToStaticMarkup(<Editor mode="authorized" />);
 
     for (const label of [
-      "New entry",
+      "New note",
       "Title",
       "Slug",
       "Summary",

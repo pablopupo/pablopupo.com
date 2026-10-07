@@ -36,37 +36,50 @@
       "id": "gradus-ad-parnassum",
       "label": "Gradus ad Parnassum",
       "type": "project",
-      "href": "https://github.com/pablopupo/gradus-ad-parnassum",
-      "text": "A retrieval system over musical notation that parses and annotates scores, then answers theory questions with measure references.",
+      "href": "/work/gradus-ad-parnassum",
+      "text": "An early exploration of retrieval over musical notation, working toward answers grounded in specific measures of a score.",
       "pinned": true,
-      "tags": ["music", "notation", "retrieval"]
+      "tags": [
+        "music",
+        "notation",
+        "retrieval"
+      ]
     },
     {
       "id": "kit-ai",
       "label": "Kit AI",
       "type": "project",
-      "href": "https://github.com/pablopupo/kit-ai",
+      "href": "/work/kit-ai",
       "text": "An offline-first emergency first-aid PWA with IndexedDB retrieval and an online/offline text-to-speech fallback. A related fine-tuned Llama 3.2 3B model remains a separate experiment.",
       "pinned": true,
-      "tags": ["on-device-ai", "retrieval", "emergency-medicine"]
+      "tags": [
+        "on-device-ai",
+        "retrieval",
+        "emergency-medicine"
+      ]
     },
     {
       "id": "accordo",
       "label": "Accordo",
       "type": "project",
-      "href": null,
-      "text": "A booking and payments marketplace for musicians, covering bookings, contracts, and payment workflows.",
+      "href": "/accordo",
+      "text": "A platform I’m building to connect musicians with one another and with opportunities. Our ambition is to modernize the music community.",
       "pinned": false,
-      "tags": ["music", "payments"]
+      "tags": [
+        "music",
+        "payments"
+      ]
     },
     {
       "id": "nova",
       "label": "Nova",
       "type": "project",
-      "href": "https://github.com/pablopupo/Nova",
+      "href": "/work/nova",
       "text": "A Solana Pay invoicing app with QR payments, transaction tracking, and dashboards. It won Best Use of Solana at SwampHacks.",
       "pinned": true,
-      "tags": ["payments"]
+      "tags": [
+        "payments"
+      ]
     }
   ]
 }

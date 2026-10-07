@@ -1,4 +1,5 @@
 import type { PublicProfile } from "@/lib/public-profile";
+import CopyEmail from "./copy-email";
 
 type ProfileLinkKind =
   | "github"
@@ -60,11 +61,13 @@ function ProfileIcon({ kind }: { kind: ProfileLinkKind }) {
 
 export default function ProfileLinks({
   profile,
+  label = "Profile links",
 }: {
   profile: Pick<
     PublicProfile,
     "contactEmail" | "githubUrl" | "linkedinUrl" | "youtubeUrl"
   >;
+  label?: string;
 }) {
   const links = [
     profile.githubUrl
@@ -84,7 +87,7 @@ export default function ProfileLinks({
           kind: "email" as const,
         }
       : null,
-    { href: "/resume", label: "Résumé", kind: "resume" as const },
+    { href: "/resume", label: "Resume", kind: "resume" as const },
     { href: "/rss.xml", label: "RSS", kind: "rss" as const },
     profile.youtubeUrl
       ? {
@@ -96,13 +99,17 @@ export default function ProfileLinks({
   ].filter((link): link is NonNullable<typeof link> => link !== null);
 
   return (
-    <nav className="profile-icon-links" aria-label="Profile links">
-      {links.map((link) => (
+    <nav className="profile-icon-links" aria-label={label}>
+      {links.map((link) => link.kind === "email" && profile.contactEmail ? (
+        <CopyEmail key={link.label} email={profile.contactEmail} icon={<ProfileIcon kind="email" />} />
+      ) : (
         <a
           key={link.label}
           href={link.href}
           aria-label={link.label}
           title={link.label}
+          target={link.kind !== "rss" ? "_blank" : undefined}
+          rel={link.kind !== "rss" ? "noopener noreferrer" : undefined}
         >
           <ProfileIcon kind={link.kind} />
         </a>

@@ -10,13 +10,13 @@ beforeEach(() => {
 
 describe("legacy work routes", () => {
   it.each([
-    ["projects", () => import("./projects/page")],
-    ["contributions", () => import("./contributions/page")],
-  ])("redirects /%s to the combined work page", async (_route, loadPage) => {
+    ["projects", "/work", () => import("./projects/page")],
+    ["contributions", "/work/contributions", () => import("./contributions/page")],
+  ])("redirects /%s to its current location", async (_route, destination, loadPage) => {
     const page = await loadPage();
 
     page.default();
 
-    expect(redirect).toHaveBeenCalledWith("/work");
+    expect(redirect).toHaveBeenCalledWith(destination);
   });
 });

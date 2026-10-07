@@ -92,7 +92,7 @@ describe("legacy public graph", () => {
         }),
         expect.objectContaining({
           id: "project:live-project",
-          href: "/work#live-project",
+          href: "/work/live-project",
           summary: "A retrieval system.",
           pinned: true,
         }),
@@ -379,7 +379,7 @@ describe("stored public graph", () => {
           id: "project:project-id",
           label: "Live system",
           summary: "A retrieval system.",
-          href: "/work#live-project",
+          href: "/work/live-project",
           deg: 2,
         }),
         expect.objectContaining({

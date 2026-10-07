@@ -12,6 +12,7 @@
     "pr": 3722,
     "url": "https://github.com/docling-project/docling/pull/3722",
     "title": "new BoxNote document backend",
+    "homepageTitle": "Added support for Box Notes",
     "date": "2026-07-07",
     "status": "merged"
   },
@@ -28,6 +29,7 @@
     "pr": 1888,
     "url": "https://github.com/dottxt-ai/outlines/pull/1888",
     "title": "structured outputs fix for newer vLLM servers",
+    "homepageTitle": "Fixed structured outputs with newer vLLM servers",
     "date": "2026-07-03",
     "status": "merged"
   },
@@ -164,6 +166,7 @@
     "pr": 1973,
     "url": "https://github.com/cuthbertLab/music21/pull/1973",
     "title": "unpitched grace notes exported schema-invalid MusicXML",
+    "homepageTitle": "Fixed MusicXML export for unpitched grace notes",
     "date": "2026-07-05",
     "status": "merged"
   },

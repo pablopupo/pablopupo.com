@@ -70,4 +70,12 @@ describe("public search API", () => {
       results: [],
     });
   });
+
+  it("returns every match for the full search view", async () => {
+    const results = Array.from({ length: 7 }, (_, index) => ({ href: `/writing/${index}` }));
+    mocks.searchPublicContent.mockResolvedValue({ status: "ready", query: "music", results });
+    const { GET } = await import("./route");
+    const response = await GET(new Request("https://example.com/api/search?q=music&all=1"));
+    expect(await response.json()).toMatchObject({ total: 7, results });
+  });
 });

@@ -12,8 +12,8 @@ const approvedAssets = [
   },
   {
     path: "public/Pablo-Pupo-Resume.pdf",
-    byteSize: 119_473,
-    sha256: "9a1f7a93b1fe4a1b9879ad3fca8f589961d4f6085e895be11cc02b21a1b99096",
+    byteSize: 119_373,
+    sha256: "8c3b66df6caa16d40516eb9295b62494b5b4b003ee05bf7769b7c21338272369",
   },
 ] as const;
 

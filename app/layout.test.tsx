@@ -118,7 +118,8 @@ describe("root layout discovery metadata", () => {
     expect(html).toContain('href="https://youtube.com/@profile-from-ui"');
     expect(html).toContain('href="/resume"');
     expect(html).not.toContain('href="/media/current-resume.pdf"');
-    expect(html).toContain('href="mailto:hello@example.com"');
+    expect(html).toContain('aria-label="Copy email address"');
+    expect(html).toContain('class="email-copy-button"');
     expect(html).toContain('href="/rss.xml"');
     expect(html).not.toContain("Hugging Face");
   });

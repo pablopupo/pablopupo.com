@@ -30,6 +30,17 @@ const project = {
 };
 
 describe("public work", () => {
+  it("keeps homepage projects brief when a case study has no summary", () => {
+    const html = renderToStaticMarkup(<ProjectList compact projects={[{
+      ...project,
+      summary: null,
+      bodyMarkdown: "A short introduction.\n\n## Implementation\n\nLong case-study details.",
+    }]} />);
+    expect(html).toContain("A short introduction.");
+    expect(html).toContain('href="/work/safe-links"');
+    expect(html).not.toContain("Long case-study details");
+  });
+
   it("renders safe web links and omits executable URLs", () => {
     const html = renderToStaticMarkup(<ProjectList projects={[project]} />);
 

@@ -103,6 +103,7 @@ export function shouldMarkDocumentTransaction(
 type AutosaveState = {
   dirty: boolean;
   entryId: string | null;
+  newDraftReady?: boolean;
   publicationStatus: "draft" | "scheduled" | "published" | "archived";
   persistenceStatus: PersistenceStatus;
   paused: boolean;
@@ -111,7 +112,7 @@ type AutosaveState = {
 export function shouldScheduleAutosave(state: AutosaveState) {
   return (
     state.dirty &&
-    Boolean(state.entryId) &&
+    (Boolean(state.entryId) || state.newDraftReady === true) &&
     state.publicationStatus === "draft" &&
     state.persistenceStatus === "unsaved" &&
     !state.paused

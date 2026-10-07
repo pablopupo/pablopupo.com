@@ -41,7 +41,7 @@ describe("public site identity", () => {
       "/music/chopin-etude"
     );
     expect(publicProjectPath("gradus-ad-parnassum")).toBe(
-      "/work#gradus-ad-parnassum"
+      "/work/gradus-ad-parnassum"
     );
   });
 
@@ -66,6 +66,7 @@ describe("public site identity", () => {
     expect(identity.structuredData.sameAs).toEqual([
       "https://github.com/pablopupo",
       "https://linkedin.com/in/pablopupo",
+      "https://www.youtube.com/@pablopupo4688",
     ]);
     expect(identity.structuredData.knowsAbout).not.toContain(
       "Open-source software"
@@ -85,6 +86,7 @@ describe("public site identity", () => {
       contactEmail: null,
       githubUrl: "https://github.com/example",
       linkedinUrl: null,
+      youtubeUrl: null,
       portraitUrl: "https://assets.example.com/pablo.webp",
     });
 

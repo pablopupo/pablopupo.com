@@ -25,11 +25,14 @@ afterEach(() => {
   container = null;
 });
 
-function mountKnowledgeGraph(data: PublicGraphData) {
+function mountKnowledgeGraph(
+  data: PublicGraphData,
+  props: Omit<React.ComponentProps<typeof KnowledgeGraph>, "data"> = {}
+) {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  act(() => root?.render(<KnowledgeGraph data={data} />));
+  act(() => root?.render(<KnowledgeGraph data={data} {...props} />));
   return container;
 }
 
@@ -194,6 +197,53 @@ const connectedOrderGraph = {
 } as unknown as PublicGraphData;
 
 describe("knowledge graph", () => {
+  it("starts with no selection and lets visitors choose either hub from the invitation", () => {
+    const hubs: PublicGraphData = {
+      ...identityGraph,
+      nodes: identityGraph.nodes.map((node) => node.id === "applied-ai" ? { ...node, label: "Engineering", hub: "engineering" } : node.id === "music" ? { ...node, hub: "music" } : node),
+    };
+    const mounted = mountKnowledgeGraph(hubs);
+    expect(mounted.querySelector('[aria-pressed="true"]')).toBeNull();
+    expect(mounted.querySelectorAll('.graph-map-node.is-hub')).toHaveLength(2);
+    const engineering = mounted.querySelector<HTMLButtonElement>('.graph-starting-points button')!;
+    act(() => engineering.click());
+    expect(mounted.querySelector('.graph-inspector h3')?.textContent).toBe("Engineering");
+    expect(document.activeElement).toBe(graphNode(mounted, "applied-ai"));
+    act(() => selectGraphNode(mounted, "applied-ai"));
+    expect(mounted.querySelector('[aria-pressed="true"]')).toBeNull();
+    const music = mounted.querySelectorAll<HTMLButtonElement>('.graph-starting-points button')[1];
+    act(() => music.click());
+    expect(mounted.querySelector('.graph-inspector h3')?.textContent).toBe("Music");
+    expect(document.activeElement).toBe(graphNode(mounted, "music"));
+  });
+
+  it("opens on a project and keeps its details when the same point is selected again", () => {
+    const mounted = mountKnowledgeGraph(identityGraph, { initialSelectedId: "project:gradus" });
+
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe("Gradus ad Parnassum");
+    act(() => selectGraphNode(mounted, "project:gradus"));
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe("Gradus ad Parnassum");
+    expect(mounted.querySelector(".graph-toolbar")).toBeNull();
+  });
+
+  it("lets a visitor play a recording in the map and unloads it when they leave that point", () => {
+    const performance = {
+      id: "entry:music:beethoven", label: "Beethoven", type: "music" as const,
+      href: "/music/beethoven", summary: "A piano performance.", pinned: false, deg: 0,
+    };
+    const mounted = mountKnowledgeGraph({ ...identityGraph, nodes: [...identityGraph.nodes, performance] }, {
+      initialSelectedId: performance.id,
+      performances: { [performance.id]: { youtubeUrl: "https://www.youtube.com/watch?v=x1hzJP3AuD0", title: "Beethoven" } },
+    });
+
+    expect(mounted.querySelector("iframe")).toBeNull();
+    act(() => mounted.querySelector<HTMLButtonElement>(".youtube-preview")!.click());
+    expect(mounted.querySelector("iframe")?.getAttribute("src")).toBe("https://www.youtube-nocookie.com/embed/x1hzJP3AuD0?autoplay=1");
+    expect(mounted.querySelector("iframe")?.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin allow-presentation");
+    act(() => selectGraphNode(mounted, "project:gradus"));
+    expect(mounted.querySelector("iframe")).toBeNull();
+  });
+
   it("renders an interactive SVG map beside a neutral overview", () => {
     const html = renderToStaticMarkup(<KnowledgeGraph data={identityGraph} />);
     const svgPosition = html.indexOf("<svg");
@@ -203,11 +253,8 @@ describe("knowledge graph", () => {
     expect(html).toContain('role="group"');
     expect(html).not.toContain("<canvas");
     expect(html).not.toContain('aria-pressed="true"');
-    expect(html).toContain("Knowledge map");
-    expect(html).toContain("<h2>Explore the connections</h2>");
-    expect(html).toContain(
-      "Select a node to see how projects, notes, ideas, and music connect."
-    );
+    expect(html).toContain("<h3>Pick a starting point</h3>");
+    expect(html).not.toContain("Follow what interests you.");
     expect(inspectorPosition).toBeGreaterThan(svgPosition);
   });
 
@@ -231,7 +278,7 @@ describe("knowledge graph", () => {
         "graph-inspector-transition"
       )
     ).toBe(true);
-    expect(mounted.querySelector(".graph-inspector h2")?.textContent).toBe(
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe(
       "Gradus ad Parnassum"
     );
 
@@ -325,7 +372,7 @@ describe("knowledge graph", () => {
     act(() => selectGraphNode(mounted, "project:gradus"));
 
     expect(startViewTransition).not.toHaveBeenCalled();
-    expect(mounted.querySelector(".graph-inspector h2")?.textContent).toBe(
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe(
       "Gradus ad Parnassum"
     );
   });
@@ -346,7 +393,7 @@ describe("knowledge graph", () => {
     expect(gradus.getAttribute("aria-pressed")).toBe("true");
     const selectedContent = mounted.querySelector(".graph-inspector-content");
     expect(selectedContent).not.toBe(overviewContent);
-    expect(mounted.querySelector(".graph-inspector h2")?.textContent).toBe(
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe(
       "Gradus ad Parnassum"
     );
     expect(mounted.querySelector(".graph-inspector-summary")?.textContent).toBe(
@@ -359,8 +406,8 @@ describe("knowledge graph", () => {
     expect(mounted.querySelector(".graph-inspector-content")).not.toBe(
       selectedContent
     );
-    expect(mounted.querySelector(".graph-inspector h2")?.textContent).toBe(
-      "Explore the connections"
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe(
+      "Pick a starting point"
     );
   });
 
@@ -461,7 +508,7 @@ describe("knowledge graph", () => {
       graphNode(mounted, "project:gradus").getAttribute("aria-pressed")
     ).toBe("false");
     expect(document.activeElement).toBe(graphNode(mounted, "applied-ai"));
-    expect(mounted.querySelector(".graph-inspector h2")?.textContent).toBe(
+    expect(mounted.querySelector(".graph-inspector h3")?.textContent).toBe(
       "Applied AI"
     );
   });
@@ -487,10 +534,12 @@ describe("knowledge graph", () => {
     expect(html).not.toContain("<aside");
   });
 
-  it("removes the old legend and hover caption", () => {
+  it("explains the symbols with a compact key and a section heading", () => {
     const html = renderToStaticMarkup(<KnowledgeGraph data={identityGraph} />);
 
-    expect(html).not.toContain("graph-legend");
+    expect(html).toContain('id="connections-title"');
+    expect(html).toContain('aria-label="Map key"');
+    for (const label of ["Projects", "Topics", "Music", "Writing"]) expect(html).toContain(`<span>${label}</span>`);
     expect(html).not.toContain("graph-caption");
     expect(html).not.toContain("hover or select a node");
   });

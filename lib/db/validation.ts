@@ -1,3 +1,4 @@
+import { seriesSlug } from "../series";
 import { z } from "zod";
 import { analyzeAuthoringMarkdown } from "../markdown/youtube";
 
@@ -81,6 +82,17 @@ export const entryTagsSchema = z
       }
       seen.add(key);
     });
+    const series = tags.filter((tag) => /^series:/i.test(tag));
+    const parts = tags.filter((tag) => /^part:/i.test(tag));
+    if (series.length > 1 || parts.length > 1) {
+      context.addIssue({ code: "custom", message: "Choose one series and one part number per post" });
+    }
+    if (series.some((tag) => !seriesSlug(tag.slice(7).trim()))) {
+      context.addIssue({ code: "custom", message: "Give the series a name" });
+    }
+    if (parts.length && (!series.length || !/^part:[1-9]\d{0,2}$/i.test(parts[0]))) {
+      context.addIssue({ code: "custom", message: "Part numbers need a series and must be between 1 and 999" });
+    }
   });
 
 function validatePublication(
@@ -119,7 +131,7 @@ function validatePublication(
   }
 }
 
-const performanceMetadataSchema = z
+export const performanceMetadataSchema = z
   .object({
     workTitle: z.string().trim().min(1).max(200),
     composer: z.string().trim().min(1).max(200),

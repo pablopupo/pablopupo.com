@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/page-link";
 import { usePathname } from "next/navigation";
 import HeaderSearch from "./header-search";
 import ThemeToggle from "./theme-toggle";
+import ViewTransition from "@/components/view-transition";
 
 const links = [
-  ["/", "Home"],
-  ["/work", "Work"],
-  ["/writing", "Writing"],
+  ["/work", "Engineering"],
   ["/music", "Music"],
+  ["/accordo", "Accordo"],
+  ["/writing", "Writing"],
   ["/about", "About"],
 ] as const;
 
@@ -25,10 +26,7 @@ export default function Nav() {
       </NavigationLink>
       <div className="nav-links">
         {links.map(([href, label]) => {
-          const current =
-            href === "/"
-              ? pathname === "/"
-              : pathname === href || pathname.startsWith(`${href}/`);
+          const current = pathname === href || pathname.startsWith(`${href}/`);
 
           return (
             <NavigationLink
@@ -37,6 +35,9 @@ export default function Nav() {
               aria-current={current ? "page" : undefined}
             >
               {label}
+              {current && <ViewTransition name="navigation-indicator" share="navigation-indicator" default="none">
+                <span className="nav-current-indicator" aria-hidden="true" />
+              </ViewTransition>}
             </NavigationLink>
           );
         })}

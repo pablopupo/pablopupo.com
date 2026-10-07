@@ -1,8 +1,13 @@
 import MarkdownContent from "@/components/markdown-content";
+import Link from "@/components/page-link";
+import ContentLink from "./content-link";
+import { externalLinkProps } from "@/lib/links";
+import { projectExcerpt } from "@/lib/editorial";
+import { publicProjectPath } from "@/lib/site";
 import { shortRef, type Contribution } from "@/lib/contributions";
 import type { PublicProject } from "@/lib/public-content";
 
-function safeProjectUrl(value: string) {
+export function safeProjectUrl(value: string) {
   if (/^\/(?!\/)/.test(value)) return value;
   try {
     const url = new URL(value);
@@ -66,7 +71,7 @@ export function ProjectList({
         return (
           <article className="project" id={project.slug} key={project.slug}>
             <div className="project-heading">
-              <h3>{project.title}</h3>
+              <h3>{compact ? <Link href={publicProjectPath(project.slug)}>{project.title}</Link> : project.title}</h3>
               {project.technologies.length > 0 && (
                 <p className="project-technologies">
                   {project.technologies.join(" · ")}
@@ -74,19 +79,17 @@ export function ProjectList({
               )}
             </div>
             <p className="project-meta">{metadata.join(" · ")}</p>
-            {project.summary && (
+            {!compact && project.summary && (
               <p className="project-summary">{project.summary}</p>
             )}
             {!compact && <MarkdownContent markdown={project.bodyMarkdown} />}
-            {compact && !project.summary && (
-              <MarkdownContent markdown={project.bodyMarkdown} />
-            )}
+            {compact && <p className="project-summary">{projectExcerpt(project)}</p>}
             {links.length > 0 && (
               <p className="project-links">
                 {links.map((link) => (
-                  <a href={link.href} key={`${project.slug}-${link.href}`}>
+                  <ContentLink href={link.href} {...externalLinkProps(link.href)} key={`${project.slug}-${link.href}`}>
                     {link.label}
-                  </a>
+                  </ContentLink>
                 ))}
               </p>
             )}
@@ -115,7 +118,7 @@ export function OpenSourceList({
       {visible.map((contribution) => (
         <li key={contribution.url}>
           <div>
-            <a className="oss-ref" href={contribution.url}>
+            <a className="oss-ref" href={contribution.url} {...externalLinkProps(contribution.url)}>
               {shortRef(contribution)}
             </a>
             <span className="oss-status">{contribution.status}</span>

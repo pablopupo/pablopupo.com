@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import { performanceMetadataSchema } from "./db/validation";
 
 const postsDir = path.join(process.cwd(), "content", "posts");
 
@@ -12,7 +13,35 @@ export type Post = {
   tags: string[];
   content: string;
   readMinutes: number;
+  performance?: {
+    workTitle: string;
+    composer: string;
+    youtubeUrl: string;
+    venue: string | null;
+    performedAt: string | null;
+    notesMarkdown: string | null;
+  };
 };
+
+export function readPostPerformance(data: Record<string, unknown>): Post["performance"] {
+  if (data.kind !== "performance") return undefined;
+  const details = performanceMetadataSchema.parse({
+    workTitle: data.workTitle,
+    composer: data.composer,
+    youtubeUrl: data.youtubeUrl,
+    venue: data.venue,
+    performedAt: data.performedAt,
+    notesMarkdown: data.notesMarkdown,
+  });
+  return {
+    workTitle: details.workTitle,
+    composer: details.composer,
+    youtubeUrl: details.youtubeUrl,
+    venue: details.venue ?? null,
+    performedAt: details.performedAt?.toISOString() ?? null,
+    notesMarkdown: details.notesMarkdown ?? null,
+  };
+}
 
 export function readingTime(content: string): number {
   const words = content.split(/\s+/).filter(Boolean).length;
@@ -32,6 +61,7 @@ function readPost(file: string): Post & { draft: boolean } {
     draft: data.draft === true,
     content,
     readMinutes: readingTime(content),
+    performance: readPostPerformance(data),
   };
 }
 

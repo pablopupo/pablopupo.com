@@ -163,6 +163,26 @@ describe.sequential("profile migration seed", () => {
 });
 
 describe.sequential("admin settings repository", () => {
+  it("persists page edits, merges only changed fields, and exposes them to the public reader", async () => {
+    await insertMedia(portraitId, "profile", "image/jpeg");
+    await insertMedia(resumeId, "resume", "application/pdf");
+    await insertSettings();
+    const repository = (await repositories()).settings;
+    await repository.updateSettings(1, { pageCopy: { musicIntro: "New recordings every week.", writingIntro: "Notes from my desk." } });
+    await repository.updateSettings(2, { pageCopy: { musicIntro: "" } });
+    await repository.updateSettings(3, { aboutMarkdown: "Updated biography." });
+    await expect(repository.getSettings()).resolves.toMatchObject({
+      version: 4, aboutMarkdown: "Updated biography.",
+      pageCopy: { musicIntro: "", writingIntro: "Notes from my desk." },
+    });
+    await expect(repository.updateSettings(2, { pageCopy: { writingIntro: "Stale" } })).rejects.toMatchObject({ name: "SettingsConflictError" });
+    const { createPublicProfileReader, createPublicProfileRepository } = await import("../public-profile");
+    const reader = createPublicProfileReader({ databaseUrl: () => "configured", readSettings: createPublicProfileRepository(database()).readSettings });
+    await expect(reader.getProfile()).resolves.toMatchObject({
+      aboutMarkdown: "Updated biography.", pageCopy: { musicIntro: "", writingIntro: "Notes from my desk.", aboutSchool: "University of Florida" },
+    });
+  });
+
   it("loads media references and updates a partial patch at the expected version", async () => {
     await insertMedia(portraitId, "profile", "image/jpeg");
     await insertMedia(resumeId, "resume", "application/pdf");

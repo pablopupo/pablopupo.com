@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { AdminShell } from "./admin-shell";
+import { DEFAULT_PROFILE_ASSETS } from "@/lib/profile-assets";
 import {
   uploadMedia,
   validateMediaUpload,
@@ -354,16 +355,16 @@ export default function ProfileEditor() {
           <h2>Portrait and resume</h2>
           <div className="profile-asset">
             <div className="profile-preview portrait-preview">
-              {portrait ? (
-                <img src={portrait.url} alt={portrait.altText ?? "Current portrait"} />
+              {settings.version > 0 ? (
+                <img src={portrait?.url ?? DEFAULT_PROFILE_ASSETS.portraitUrl} alt={portrait?.altText ?? DEFAULT_PROFILE_ASSETS.portraitAlt} />
               ) : (
-                <span>No portrait selected</span>
+                <span>{initialLoadFailed ? "Portrait unavailable" : "Loading portrait"}</span>
               )}
             </div>
             <label>
               Portrait
               <select value={settings.avatarMediaId ?? ""} onChange={(event) => updateSettings({ avatarMediaId: event.target.value || null })} disabled={formBusy}>
-                <option value="">No portrait</option>
+                <option value="">Use default portrait</option>
                 {media.filter(isImage).map((item) => (
                   <option key={item.id} value={item.id}>{item.altText || item.url}</option>
                 ))}
@@ -379,16 +380,16 @@ export default function ProfileEditor() {
 
           <div className="profile-asset">
             <div className="profile-preview resume-preview">
-              {resume ? (
-                <a href={resume.url} target="_blank" rel="noreferrer">View current resume</a>
+              {settings.version > 0 ? (
+                <a href={resume?.url ?? DEFAULT_PROFILE_ASSETS.resumeUrl} target="_blank" rel="noopener noreferrer">View current resume</a>
               ) : (
-                <span>No resume selected</span>
+                <span>{initialLoadFailed ? "Resume unavailable" : "Loading resume"}</span>
               )}
             </div>
             <label>
               Resume
               <select value={settings.resumeMediaId ?? ""} onChange={(event) => updateSettings({ resumeMediaId: event.target.value || null })} disabled={formBusy}>
-                <option value="">No resume</option>
+                <option value="">Use default resume</option>
                 {media.filter(isPdf).map((item) => (
                   <option key={item.id} value={item.id}>{item.url}</option>
                 ))}

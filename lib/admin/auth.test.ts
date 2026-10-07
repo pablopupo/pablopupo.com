@@ -272,6 +272,16 @@ describe("admin request authorization", () => {
       )
     ).toBe(false);
   });
+
+  it("checks the browser Host when Next normalizes the internal request URL", () => {
+    const origin = "http://127.0.0.1:3100";
+    const request = (headers: Record<string, string>) => new Request("http://localhost:3100/api/admin/settings", { method: "PATCH", headers });
+    expect(adminAuth.hasSameOrigin(request({ origin, host: "127.0.0.1:3100" }), origin)).toBe(true);
+    expect(adminAuth.hasSameOrigin(request({ origin: "https://attacker.example", host: "127.0.0.1:3100" }), origin)).toBe(false);
+    expect(adminAuth.hasSameOrigin(request({ origin, host: "attacker.example" }), origin)).toBe(false);
+    expect(adminAuth.hasSameOrigin(request({ origin, host: "attacker.example", "x-forwarded-host": "127.0.0.1:3100" }), origin)).toBe(false);
+    expect(adminAuth.hasSameOrigin(request({ host: "127.0.0.1:3100" }), origin)).toBe(false);
+  });
 });
 
 function readConfiguredEnvironment() {

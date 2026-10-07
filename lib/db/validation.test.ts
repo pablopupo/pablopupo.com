@@ -37,6 +37,15 @@ const project = {
 };
 
 describe("entryMutationSchema", () => {
+  it("validates optional series membership and ordering", () => {
+    for (const tags of [["series:Weekly recordings"], ["engineering", "series:Building a search engine", "part:12"]]) {
+      expect(entryMutationSchema.safeParse({ ...note, tags }).success).toBe(true);
+    }
+    for (const tags of [["part:1"], ["series:"], ["series:!!!"], ["series:A", "series:B"], ["series:A", "part:0"], ["series:A", "part:1.5"], ["series:A", "part:1000"], ["series:A", "part:1", "part:2"]]) {
+      expect(entryMutationSchema.safeParse({ ...note, tags }).success).toBe(false);
+    }
+  });
+
   it("accepts a portable Markdown note", () => {
     expect(entryMutationSchema.parse(note)).toMatchObject(note);
   });

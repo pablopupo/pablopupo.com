@@ -1,4 +1,5 @@
 "use client";
+import { performanceDateInput, performanceDateValue } from "@/lib/performance-date";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -26,6 +27,9 @@ import {
 import { AdminAccessState, AdminShell } from "./admin-shell";
 import MarkdownEditor, { type MarkdownSnapshot } from "./markdown-editor";
 import { preparePreviewWindow } from "@/lib/admin/preview-window";
+import { entrySeries, isSeriesTag, setSeriesTags, visibleEntryTags } from "@/lib/series";
+import { postTemplate, type PostTemplate } from "./post-template";
+import { availableDraftSlug } from "./draft-title";
 
 type AdminMode = "unconfigured" | "signed-out" | "forbidden" | "authorized";
 
@@ -264,7 +268,7 @@ function normalizeEntry(value: Record<string, unknown>): EditorEntry {
       workTitle: performance.workTitle ?? "",
       composer: performance.composer ?? "",
       venue: performance.venue ?? "",
-      performedAt: formatDateTimeLocal(performance.performedAt),
+      performedAt: performanceDateInput(performance.performedAt),
       youtubeUrl: performance.youtubeUrl ?? "",
       notesMarkdown: performance.notesMarkdown ?? "",
     },
@@ -288,7 +292,7 @@ function mutation(entry: EditorEntry, tagsInput: string) {
             workTitle: entry.performance.workTitle,
             composer: entry.performance.composer,
             venue: entry.performance.venue || undefined,
-            performedAt: parseDateTimeLocal(entry.performance.performedAt),
+            performedAt: performanceDateValue(entry.performance.performedAt),
             youtubeUrl: entry.performance.youtubeUrl,
             notesMarkdown: entry.performance.notesMarkdown || undefined,
           }
@@ -311,6 +315,9 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   const [entry, setEntry] = useState<EditorEntry>(blankEntry);
   const [scheduledAt, setScheduledAt] = useState("");
   const [tagsInput, setTagsInput] = useState("");
+  const [visibleTagsInput, setVisibleTagsInput] = useState("");
+  const [seriesNameInput, setSeriesNameInput] = useState("");
+  const [seriesOrderInput, setSeriesOrderInput] = useState("");
   const [documentGeneration, setDocumentGeneration] = useState(0);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -377,6 +384,35 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     markDirty();
   }
 
+  function changeTitle(title: string) {
+    const existingSlugs = entries.map((item) => item.slug);
+    const previousSuggestion = availableDraftSlug(entry.title, existingSlugs);
+    const autoSlug = !entry.id && (!entry.slug || entry.slug === previousSuggestion);
+    changeEntry({ title, ...(autoSlug ? { slug: availableDraftSlug(title, existingSlugs) } : {}) });
+  }
+
+  function adoptTags(value: string) {
+    setTagsInput(value);
+    const tags = parseTagInput(value);
+    const visibleTags = visibleEntryTags(tags).join(", ");
+    setVisibleTagsInput((current) => parseTagInput(current).join(", ") === visibleTags ? current : visibleTags);
+    const title = tags.find((tag) => /^series:/i.test(tag))?.slice(7) ?? "";
+    const part = tags.find((tag) => /^part:/i.test(tag))?.slice(5) ?? "";
+    setSeriesNameInput((current) => current.trim() === title ? current : title);
+    setSeriesOrderInput(part);
+  }
+
+  function changeSeries(title: string, part: string) {
+    if (title.includes(",")) {
+      setMessage("Use a series name without commas.");
+      return;
+    }
+    setSeriesNameInput(title);
+    setSeriesOrderInput(title.trim() ? part : "");
+    setTagsInput(setSeriesTags(parseTagInput(tagsInput), title, part).join(", "));
+    markDirty();
+  }
+
   function changePerformance(changes: Partial<PerformanceFields>) {
     setEntry((current) => ({
       ...current,
@@ -404,7 +440,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     );
   }
 
-  async function loadEntries() {
+  async function loadEntries(resumeDraft = false) {
     try {
       const response = await fetch("/api/admin/entries", { cache: "no-store" });
       const payload = await responsePayload(response);
@@ -412,9 +448,16 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         setMessage(payload?.error ?? `Could not load entries (${response.status})`);
         return;
       }
-      setEntries(
-        (payload?.entries ?? []).map((item) => normalizeEntry(item) as EntrySummary)
-      );
+      const loadedEntries = (payload?.entries ?? []).map((item) => normalizeEntry(item) as EntrySummary);
+      setEntries(loadedEntries);
+      if (resumeDraft && editGeneration.current === 0 && documentEpoch.current === 0) {
+        const requestedSlug = new URLSearchParams(window.location.search).get("entry");
+        const requestedEntry = requestedSlug ? loadedEntries.find((item) => item.slug === requestedSlug) : undefined;
+        if (requestedEntry?.id) { await loadEntry(requestedEntry.id, true); return; }
+        const latestDraft = loadedEntries.filter((item) => item.status === "draft")
+          .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))[0];
+        if (latestDraft?.id) await loadEntry(latestDraft.id, true);
+      }
     } catch {
       setMessage("Network request failed");
     }
@@ -442,7 +485,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   }
 
   useEffect(() => {
-    if (mode === "authorized") void loadEntries();
+    if (mode === "authorized") void loadEntries(true);
   }, [mode]);
 
   async function loadEntry(id: string, discardConfirmed = false) {
@@ -476,7 +519,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         }
         const loaded = normalizeEntry(payload.entry);
         setEntry(loaded);
-        setTagsInput(loaded.tags.join(", "));
+        adoptTags(loaded.tags.join(", "));
         markDocumentReplacement();
         const epoch = documentEpoch.current;
         adoptScheduledAt(
@@ -581,7 +624,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         reconcileSavedEntry(current, saved, changedDuringRequest)
       );
       if (!changedDuringRequest) {
-        setTagsInput(saved.tags.join(", "));
+        adoptTags(saved.tags.join(", "));
       }
       applyPersistenceState(successfulSaveState(changedDuringRequest));
       retryQueuedSave = true;
@@ -700,7 +743,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       if (disposition.dirty) {
         applyPersistenceState(successfulSaveState(true));
       } else {
-        setTagsInput(restored.tags.join(", "));
+        adoptTags(restored.tags.join(", "));
         markDocumentReplacement();
       }
       adoptScheduledAt(
@@ -789,7 +832,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
             return;
           }
           setEntry(updated);
-          setTagsInput(updated.tags.join(", "));
+          adoptTags(updated.tags.join(", "));
           adoptScheduledAt(formatDateTimeLocal(updated.publishedAt));
           markDocumentReplacement();
           setRevisionPreview(null);
@@ -803,7 +846,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
             )
           );
           if (!contentChangedDuringRequest) {
-            setTagsInput(updated.tags.join(", "));
+            adoptTags(updated.tags.join(", "));
           }
           adoptScheduledAt(
             formatDateTimeLocal(updated.publishedAt),
@@ -899,7 +942,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
             setMessage("Entry deleted; newer edits retained as a new draft");
           } else {
             setEntry(blankEntry());
-            setTagsInput("");
+            adoptTags("");
             markDocumentReplacement();
             adoptScheduledAt("");
             setMessage("Entry deleted");
@@ -921,7 +964,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     }
   }
 
-  function newEntry() {
+  function newEntry(template: PostTemplate = "note") {
     if (
       !shouldDiscardUnsavedChanges(
         hasPendingEditorChanges(dirty, scheduleDirty)
@@ -929,8 +972,9 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     ) {
       return;
     }
-    setEntry(blankEntry());
-    setTagsInput("");
+    const defaults = postTemplate(template);
+    setEntry({ ...blankEntry(), ...defaults });
+    adoptTags(defaults.tags.join(", "));
     markDocumentReplacement();
     adoptScheduledAt("");
     setRevisionPreview(null);
@@ -949,6 +993,8 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       !shouldScheduleAutosave({
         dirty,
         entryId: entry.id,
+        newDraftReady: Boolean(entry.title.trim() && entry.slug.trim()) &&
+          (entry.kind !== "performance" || Boolean(entry.performance.workTitle.trim() && entry.performance.composer.trim() && entry.performance.youtubeUrl.trim())),
         publicationStatus: entry.status,
         persistenceStatus,
         paused: autosavePaused || busy,
@@ -969,6 +1015,12 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
     dirty,
     editSequence,
     entry.id,
+    entry.title,
+    entry.slug,
+    entry.kind,
+    entry.performance.workTitle,
+    entry.performance.composer,
+    entry.performance.youtubeUrl,
     entry.status,
     mode,
     persistenceStatus,
@@ -1027,11 +1079,18 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
   }
 
   const deleteAllowed = entry.status === "draft" || entry.status === "archived";
+  const currentTags = parseTagInput(tagsInput);
+  const seriesTitle = seriesNameInput;
+  const seriesPart = seriesOrderInput;
+  const existingSeries = [...new Set(entries.filter((item) => item.section === entry.section).flatMap((item) => {
+    const series = entrySeries(item);
+    return series ? [series.title] : [];
+  }))];
 
   return (
     <AdminShell
       activeTab="entries"
-      description="Markdown entry administration"
+      description="Write a note, share a recording, or pick up your latest draft."
       beforeSignOut={() =>
         shouldDiscardUnsavedChanges(
           hasPendingEditorChanges(dirty, scheduleDirty)
@@ -1041,9 +1100,11 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
       <div className="admin-editor">
       <div className="admin-layout">
         <aside className="admin-list" aria-label="Entries">
-          <button type="button" onClick={newEntry} disabled={busy}>
-            New entry
-          </button>
+          <div className="studio-new-posts">
+            <button type="button" onClick={() => newEntry("note")} disabled={busy}>New note</button>
+            <button type="button" onClick={() => newEntry("recording")} disabled={busy}>New recording</button>
+            <button type="button" onClick={() => newEntry("engineering")} disabled={busy}>Engineering post</button>
+          </div>
           <ul>
             {entries.map((item) => (
               <li key={item.id ?? item.slug}>
@@ -1059,15 +1120,43 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         </aside>
 
         <div className="admin-form">
-          <div className="admin-grid">
-            <label>Title<input value={entry.title} onChange={(event) => changeEntry({ title: event.target.value })} /></label>
+          <div className="studio-primary">
+            <label className="studio-title">Title<input placeholder="What have you been thinking about?" value={entry.title} onChange={(event) => changeTitle(event.target.value)} /></label>
+            <p className="studio-hint">{entry.kind === "performance" ? "Add your recording, then write about the piece and your interpretation. Drafts save once the title and recording fields are filled in." : "Write a note, an experiment, or a longer post. Drafts save automatically after you add a title."}</p>
+            {entry.status === "published" && <p className="studio-hint">This post is live. Saving applies your changes to the public post. Duplicate it to work on a private draft.</p>}
+          </div>
+          <details className="studio-details"><summary>Post details</summary><div className="admin-grid">
             <label>Slug<input value={entry.slug} onChange={(event) => changeEntry({ slug: event.target.value })} /></label>
-            <label>Kind<select value={entry.kind} onChange={(event) => changeEntry({ kind: event.target.value as EditorEntry["kind"] })}><option value="note">Note</option><option value="essay">Essay</option><option value="performance">Performance</option></select></label>
+            <label>Kind<select value={entry.kind} onChange={(event) => changeEntry({ kind: event.target.value as EditorEntry["kind"], ...(event.target.value === "performance" ? { section: "music" as const } : {}) })}><option value="note">Note</option><option value="essay">Essay</option><option value="performance">Performance</option></select></label>
             <label>Section<select value={entry.section} onChange={(event) => changeEntry({ section: event.target.value as EditorEntry["section"] })}><option value="writing">Writing</option><option value="music">Music</option></select></label>
             <label>Publication state<input value={entry.status} readOnly /></label>
           </div>
-          <label>Tags<input value={tagsInput} onChange={(event) => { setTagsInput(event.target.value); markDirty(); }} placeholder="TypeScript, music" /></label>
+          <label>Tags<input value={visibleTagsInput} onChange={(event) => { setVisibleTagsInput(event.target.value); setTagsInput([...visibleEntryTags(parseTagInput(event.target.value)), ...currentTags.filter(isSeriesTag)].join(", ")); markDirty(); }} placeholder="AI, retrieval, music, Accordo" /></label>
           <label>Summary<textarea rows={3} value={entry.summary} onChange={(event) => changeEntry({ summary: event.target.value })} /></label>
+          </details>
+          <fieldset className="studio-series">
+            <legend>Series (optional)</legend>
+            <div className="admin-grid">
+              <label>Series name<input list="studio-series-names" maxLength={43} value={seriesTitle} placeholder="Choose a series or name a new one" onChange={(event) => changeSeries(event.target.value, seriesPart)} /></label>
+              <datalist id="studio-series-names">{existingSeries.map((title) => <option key={title} value={title} />)}</datalist>
+              <label>Post order (optional)<input type="number" min={1} max={999} value={seriesPart} disabled={!seriesTitle.trim()} onChange={(event) => changeSeries(seriesTitle, event.target.value)} /></label>
+            </div>
+            <p className="studio-hint">Use the same name to group posts. Number them if the order matters, or leave the order blank for a journal.</p>
+          </fieldset>
+          {entry.kind === "performance" && (
+            <fieldset>
+              <legend>Recording</legend>
+              <div className="admin-grid">
+                <label>Work title<input value={entry.performance.workTitle} onChange={(event) => changePerformance({ workTitle: event.target.value })} /></label>
+                <label>Composer<input value={entry.performance.composer} onChange={(event) => changePerformance({ composer: event.target.value })} /></label>
+                <label>Venue or event<input placeholder="UF School of Music, Piano Recital" value={entry.performance.venue} onChange={(event) => changePerformance({ venue: event.target.value })} /></label>
+                <label>Performance date<input type="date" value={entry.performance.performedAt} onChange={(event) => changePerformance({ performedAt: event.target.value })} /><span className="studio-hint">The date you performed. This is shown with the recording.</span></label>
+              </div>
+              <label>YouTube URL<input value={entry.performance.youtubeUrl} onChange={(event) => changePerformance({ youtubeUrl: event.target.value })} /></label>
+              <label>Performance notes<textarea rows={5} value={entry.performance.notesMarkdown} onChange={(event) => changePerformance({ notesMarkdown: event.target.value })} /></label>
+            </fieldset>
+          )}
+
           <MarkdownEditor
             documentKey={String(documentGeneration)}
             value={entry.bodyMarkdown}
@@ -1078,24 +1167,14 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
             snapshotRef={bodyMarkdownSnapshot}
           />
 
-          {entry.kind === "performance" && (
-            <fieldset>
-              <legend>Performance metadata</legend>
-              <div className="admin-grid">
-                <label>Work title<input value={entry.performance.workTitle} onChange={(event) => changePerformance({ workTitle: event.target.value })} /></label>
-                <label>Composer<input value={entry.performance.composer} onChange={(event) => changePerformance({ composer: event.target.value })} /></label>
-                <label>Venue<input value={entry.performance.venue} onChange={(event) => changePerformance({ venue: event.target.value })} /></label>
-                <label>Performed at<input type="datetime-local" value={entry.performance.performedAt} onChange={(event) => changePerformance({ performedAt: event.target.value })} /></label>
-              </div>
-              <label>YouTube URL<input value={entry.performance.youtubeUrl} onChange={(event) => changePerformance({ youtubeUrl: event.target.value })} /></label>
-              <label>Performance notes<textarea rows={5} value={entry.performance.notesMarkdown} onChange={(event) => changePerformance({ notesMarkdown: event.target.value })} /></label>
-            </fieldset>
-          )}
+
 
           <div className="admin-actions">
             <button type="button" onClick={() => void save("manual")} disabled={busy || persistenceStatus === "saving" || !entry.slug || !entry.title}>Save</button>
             <button type="button" onClick={() => void saveEntryAndPreview(() => saveRef.current("preview"))} disabled={busy || persistenceStatus === "saving" || !entry.slug || !entry.title}>Save &amp; Preview</button>
             <button type="button" onClick={() => runAction("publish")} disabled={busy || !entry.id}>Publish now</button>
+          </div>
+          <details className="studio-details"><summary>Schedule &amp; manage</summary><div className="admin-actions">
             <label>Schedule time<input type="datetime-local" value={scheduledAt} onChange={(event) => changeScheduledAt(event.target.value)} /></label>
             <button type="button" onClick={() => runAction("schedule")} disabled={busy || !entry.id || !scheduledAt}>Schedule</button>
             <button type="button" onClick={() => runAction("unpublish")} disabled={busy || !entry.id}>Unpublish</button>
@@ -1103,6 +1182,7 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
             <button type="button" onClick={() => runAction("duplicate")} disabled={busy || !entry.id}>Duplicate</button>
             <button type="button" onClick={remove} disabled={busy || !entry.id || !deleteAllowed}>Delete</button>
           </div>
+          </details>
           <div className="admin-persistence" role="status">
             <span>{persistenceLabel(persistenceStatus, lastSavedAt)}</span>
             {persistenceStatus === "conflict" && (
@@ -1197,6 +1277,11 @@ export default function Editor({ mode, configurationStatus }: EditorProps) {
         .admin-list li + li { border-top: 1px solid var(--hairline); }
         .admin-list li button { width: 100%; border: 0; background: transparent; text-align: left; padding: 0.65rem 0; display: grid; gap: 0.15rem; }
         .admin-list li span, .admin-meta { color: var(--muted); font: 0.75rem var(--mono); }
+        .studio-primary .studio-title input { font: 500 2.2rem/1.2 var(--font-serif), Georgia, serif; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; padding: 0.6rem 0; }
+        .studio-hint { color: var(--muted); font: 0.75rem/1.6 var(--sans); margin-top: 0.6rem; }
+        .studio-details { border-block: 1px solid var(--hairline); padding: 0.6rem 0; }
+        .studio-details summary { font: 0.8rem/1.6 var(--sans); cursor: pointer; }
+        .studio-details[open] > .admin-grid, .studio-details > label { margin-top: 0.8rem; }
         .admin-form { min-width: 0; display: grid; gap: 0.85rem; }
         .admin-form label { display: grid; gap: 0.3rem; font: 0.75rem var(--mono); color: var(--muted); }
         .admin-form input, .admin-form select, .admin-form textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--hairline); border-radius: 4px; padding: 0.5rem 0.6rem; }

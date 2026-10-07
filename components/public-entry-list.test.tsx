@@ -26,6 +26,16 @@ const entries = [
 ];
 
 describe("public entry views", () => {
+  it("distinguishes the performance day from the publication date", async () => {
+    const { PublicEntryList } = await import("./public-entry-list");
+    const performance = { ...entries[0], kind: "performance" as const, performance: { performedAt: "2023-11-30T00:00:00.000Z" } };
+    const html = renderToStaticMarkup(<PublicEntryList entries={[performance]} emptyMessage="" />);
+    expect(html).toContain("Performed November 30, 2023");
+    expect(html).not.toContain("July 2, 2026");
+    const unknown = renderToStaticMarkup(<PublicEntryList entries={[{ ...performance, performance: null }]} emptyMessage="" />);
+    expect(unknown).toContain("Published July 2, 2026");
+  });
+
   it("renders editorial entry rows with useful metadata", async () => {
     const module = await import("./public-entry-list").catch(() => undefined);
     expect(module?.PublicEntryList).toBeTypeOf("function");
@@ -73,7 +83,7 @@ describe("public entry views", () => {
     expect(html).toContain("No music posted yet.");
   });
 
-  it("embeds only recognized YouTube URLs on the privacy-preserving host", async () => {
+  it("shows a lightweight preview only for recognized YouTube URLs", async () => {
     const module = await import("./public-entry-list").catch(() => undefined);
     expect(module?.YoutubeEmbed).toBeTypeOf("function");
     const YoutubeEmbed = module!.YoutubeEmbed;
@@ -89,12 +99,10 @@ describe("public entry views", () => {
     );
 
     expect(html).toContain(
-      'src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"'
+      'src="https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"'
     );
-    expect(html).toContain('title="Piano performance"');
-    expect(html).toContain(
-      'sandbox="allow-scripts allow-same-origin allow-presentation"'
-    );
+    expect(html).toContain('aria-label="Play Piano performance"');
+    expect(html).not.toContain("<iframe");
     expect(invalid).toBe("");
   });
 

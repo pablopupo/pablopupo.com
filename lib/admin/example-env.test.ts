@@ -22,6 +22,7 @@ describe("example environment", () => {
 
     expect(Object.keys(environment)).toEqual([
       "DATABASE_URL",
+      "NEXT_PUBLIC_SITE_URL",
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
       "BETTER_AUTH_SECRET",
@@ -35,7 +36,7 @@ describe("example environment", () => {
       GITHUB_CLIENT_ID: "",
       GITHUB_CLIENT_SECRET: "",
       BETTER_AUTH_SECRET: "",
-      BETTER_AUTH_URL: "http://localhost:3001",
+      BETTER_AUTH_URL: "http://127.0.0.1:3100",
       ADMIN_GITHUB_ID: "145598901",
       BLOB_READ_WRITE_TOKEN: "",
       BLOB_STORE_ID: "",

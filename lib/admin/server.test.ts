@@ -5,6 +5,15 @@ const mocks = vi.hoisted(() => ({
   drizzle: vi.fn(),
   pool: { end: vi.fn() },
   Pool: vi.fn(),
+  revalidatePath: vi.fn(),
+  updateSettings: vi.fn(),
+}));
+
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("./access", () => ({ getAdminAccess: async () => ({ status: "authorized", userId: "owner" }) }));
+vi.mock("./profile-repository", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./profile-repository")>()),
+  createAdminSettingsRepository: () => ({ getSettings: vi.fn(), updateSettings: mocks.updateSettings }),
 }));
 
 vi.mock("@neondatabase/serverless", async (importOriginal) => ({
@@ -143,6 +152,20 @@ describe("admin entry server runner", () => {
       })
     );
     expect(mocks.pool.end).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes every public profile consumer after a successful save", async () => {
+    configureEnvironment();
+    mocks.updateSettings.mockResolvedValue({ version: 6 });
+    const server = await import("./server");
+    const response = await server.withAdminSettingsHandlers((handlers) => handlers.update(new Request("https://example.com/api/admin/settings", {
+      method: "PATCH",
+      headers: { origin: "https://example.com", "content-type": "application/json" },
+      body: JSON.stringify({ expectedVersion: 5, settings: { aboutMarkdown: "Updated biography" } }),
+    })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateSettings).toHaveBeenCalledWith(5, { aboutMarkdown: "Updated biography" });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
   it("constructs media handlers with Blob dependencies and closes the pool", async () => {

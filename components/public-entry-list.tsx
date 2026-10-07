@@ -1,4 +1,6 @@
-import Link from "next/link";
+import { visibleEntryTags } from "@/lib/series";
+import Link from "@/components/page-link";
+import YoutubePlayer from "./youtube-player";
 import { NamedViewTransition } from "./view-transition";
 
 export type PublicEntryListItem = {
@@ -16,6 +18,7 @@ export type PublicEntryListItem = {
 type PublicEntryListProps = {
   entries: PublicEntryListItem[];
   emptyMessage: string;
+  headingLevel?: 2 | 3;
 };
 
 const editorialDate = new Intl.DateTimeFormat("en-US", {
@@ -32,45 +35,57 @@ export function formatEditorialDate(value: string) {
     : editorialDate.format(date);
 }
 
+export function entryDisplayDate(entry: Pick<PublicEntryListItem, "kind" | "publishedAt" | "performance">) {
+  const details = entry.performance;
+  const performedAt = details && typeof details === "object" && "performedAt" in details && typeof details.performedAt === "string" ? details.performedAt : null;
+  return entry.kind === "performance"
+    ? { value: performedAt ?? entry.publishedAt, prefix: performedAt ? "Performed " : "Published " }
+    : { value: entry.publishedAt, prefix: "" };
+}
+
 export function PublicEntryList({
   entries,
   emptyMessage,
+  headingLevel = 2,
 }: PublicEntryListProps) {
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   if (entries.length === 0) {
     return <p className="empty-state">{emptyMessage}</p>;
   }
 
   return (
     <ol className="editorial-list public-entry-list">
-      {entries.map((entry) => (
+      {entries.map((entry) => {
+        const date = entryDisplayDate(entry);
+        return (
         <li key={entry.slug}>
           <article>
-            <h2>
-              <NamedViewTransition
+            <NamedViewTransition
                 name={`entry-${entry.section}-${entry.slug}`}
               >
+              <Heading className="entry-list-heading">
                 <Link
                   className="entry-title-link"
                   href={`/${entry.section}/${entry.slug}`}
                 >
                   {entry.title}
                 </Link>
-              </NamedViewTransition>
-            </h2>
+              </Heading>
+            </NamedViewTransition>
             <p className="entry-meta entry-meta-primary">
-              <time dateTime={entry.publishedAt}>
-                {formatEditorialDate(entry.publishedAt)}
+              <time dateTime={date.value}>
+                {date.prefix}{formatEditorialDate(date.value)}
               </time>
               <span aria-hidden="true">·</span>
-              <span>{entry.readMinutes} min read</span>
+              <span>{entry.kind === "performance" ? "Performance" : `${entry.readMinutes} min read`}</span>
             </p>
             {entry.summary && <p className="entry-summary">{entry.summary}</p>}
-            {entry.tags.length > 0 && (
-              <p className="entry-tags">{entry.tags.join(" · ")}</p>
+            {visibleEntryTags(entry.tags).length > 0 && (
+              <p className="entry-tags">{visibleEntryTags(entry.tags).join(" · ")}</p>
             )}
           </article>
         </li>
-      ))}
+      );})}
     </ol>
   );
 }
@@ -100,21 +115,9 @@ function youtubeVideoId(value: string) {
   }
 }
 
-export function YoutubeEmbed({ url, title }: { url: string; title: string }) {
+export function YoutubeEmbed({ url, title, transitionName, posterSizes }: { url: string; title: string; transitionName?: string; posterSizes?: string }) {
   const id = youtubeVideoId(url);
   if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
 
-  return (
-    <div className="youtube-frame">
-      <iframe
-        src={`https://www.youtube-nocookie.com/embed/${id}`}
-        title={title}
-        loading="lazy"
-        referrerPolicy="strict-origin-when-cross-origin"
-        sandbox="allow-scripts allow-same-origin allow-presentation"
-        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowFullScreen
-      />
-    </div>
-  );
+  return <YoutubePlayer key={id} id={id} title={title} transitionName={transitionName} posterSizes={posterSizes} />;
 }

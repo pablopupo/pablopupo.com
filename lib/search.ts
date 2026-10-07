@@ -5,6 +5,9 @@ import {
   type PublicProject,
 } from "./public-content";
 import { publicEntryPath, publicProjectPath } from "./site";
+import { entrySeries, visibleEntryTags } from "./series";
+import { scoreSearchMatch } from "./search-matching";
+import { getPublicGraph, type PublicGraphData } from "./public-graph";
 
 export const SEARCH_QUERY_MIN_LENGTH = 2;
 export const SEARCH_QUERY_MAX_LENGTH = 80;
@@ -12,6 +15,7 @@ export const SEARCH_QUERY_MAX_LENGTH = 80;
 type SearchDependencies = {
   getEntries: () => Promise<PublicEntry[]>;
   getProjects: () => Promise<PublicProject[]>;
+  getGraph?: typeof getPublicGraph;
 };
 
 export type SearchResult = {
@@ -19,8 +23,9 @@ export type SearchResult = {
   title: string;
   summary: string;
   href: string;
-  section: "Writing" | "Music" | "Work";
+  section: "Writing" | "Music" | "Engineering";
   publishedAt: string;
+  kind?: "Recording" | "Writing" | "Project";
 };
 
 export type SearchResponse = {
@@ -33,16 +38,8 @@ export type SearchResponse = {
 const defaultDependencies: SearchDependencies = {
   getEntries: () => getPublicEntries(),
   getProjects: () => getPublicProjects(),
+  getGraph: getPublicGraph,
 };
-
-function normalizedText(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("en-US")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 export function escapeSearchPattern(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -82,55 +79,22 @@ function plainText(markdown: string) {
     .trim();
 }
 
-function excerpt(summary: string | null, bodyMarkdown: string) {
-  const text = plainText(summary?.trim() || bodyMarkdown);
+function excerpt(summary: string | null, bodyMarkdown: string, query: string) {
+  const paragraphs = bodyMarkdown.split(/\n\s*\n/).filter((part) => part.trim() && !/^\s*#/.test(part));
+  const summaryMatches = summary && scoreSearchMatch(query, "", plainText(summary), "", "") !== undefined;
+  const relevant = !summaryMatches && paragraphs.find((paragraph) => scoreSearchMatch(query, "", "", "", plainText(paragraph)) !== undefined);
+  const text = plainText(relevant || summary?.trim() || paragraphs[0] || bodyMarkdown);
   if (text.length <= 180) return text;
-  return `${text.slice(0, 177).trimEnd()}…`;
+  return `${text.slice(0, 177).replace(/\s+\S*$/, "").trimEnd()}…`;
 }
 
-function patternsFor(query: string) {
-  return normalizedText(query)
-    .split(" ")
-    .map((token) => new RegExp(escapeSearchPattern(token), "iu"));
-}
-
-function scoreMatch(
-  query: string,
-  title: string,
-  summary: string,
-  metadata: string,
-  body: string
-) {
-  const normalizedQuery = normalizedText(query);
-  const normalizedTitle = normalizedText(title);
-  const normalizedSummary = normalizedText(summary);
-  const normalizedMetadata = normalizedText(metadata);
-  const normalizedBody = normalizedText(body);
-  const haystack = [
-    normalizedTitle,
-    normalizedSummary,
-    normalizedMetadata,
-    normalizedBody,
-  ].join(" ");
-  const patterns = patternsFor(query);
-  if (!patterns.every((pattern) => pattern.test(haystack))) return undefined;
-
-  let score = 0;
-  if (normalizedTitle === normalizedQuery) score += 120;
-  else if (normalizedTitle.startsWith(normalizedQuery)) score += 80;
-  else if (normalizedTitle.includes(normalizedQuery)) score += 60;
-  for (const pattern of patterns) {
-    if (pattern.test(normalizedTitle)) score += 20;
-    if (pattern.test(normalizedSummary)) score += 10;
-    if (pattern.test(normalizedMetadata)) score += 8;
-    if (pattern.test(normalizedBody)) score += 2;
-  }
-  return score;
-}
-
-function entryCandidate(query: string, entry: PublicEntry) {
+function entryCandidate(query: string, entry: PublicEntry, topics = "") {
   const metadata = [
-    ...entry.tags,
+    topics,
+    entry.section,
+    entry.kind === "performance" ? "recording" : "writing",
+    ...visibleEntryTags(entry.tags),
+    entrySeries(entry)?.title,
     entry.performance?.workTitle,
     entry.performance?.composer,
     entry.performance?.venue,
@@ -138,12 +102,12 @@ function entryCandidate(query: string, entry: PublicEntry) {
   ]
     .filter((value): value is string => Boolean(value))
     .join(" ");
-  const score = scoreMatch(
+  const score = scoreSearchMatch(
     query,
     entry.title,
     entry.summary ?? "",
     metadata,
-    entry.bodyMarkdown
+    plainText(entry.bodyMarkdown)
   );
   if (score === undefined) return undefined;
   return {
@@ -151,19 +115,22 @@ function entryCandidate(query: string, entry: PublicEntry) {
     result: {
       type: "entry" as const,
       title: entry.title,
-      summary: excerpt(entry.summary, entry.bodyMarkdown),
+      summary: excerpt(entry.summary, entry.bodyMarkdown, query),
       href: publicEntryPath(entry.section, entry.slug),
       section:
         entry.section === "music"
           ? ("Music" as const)
           : ("Writing" as const),
       publishedAt: entry.publishedAt,
+      kind: entry.kind === "performance" ? "Recording" as const : "Writing" as const,
     },
   };
 }
 
-function projectCandidate(query: string, project: PublicProject) {
+function projectCandidate(query: string, project: PublicProject, topics = "") {
   const metadata = [
+    topics,
+    "engineering software project",
     project.kind,
     project.organization ?? "",
     project.startedOn ?? "",
@@ -171,12 +138,12 @@ function projectCandidate(query: string, project: PublicProject) {
     ...project.technologies,
     ...project.links.flatMap((link) => [link.kind, link.label]),
   ].join(" ");
-  const score = scoreMatch(
+  const score = scoreSearchMatch(
     query,
     project.title,
     project.summary ?? "",
     metadata,
-    project.bodyMarkdown
+    plainText(project.bodyMarkdown)
   );
   if (score === undefined) return undefined;
   return {
@@ -184,10 +151,11 @@ function projectCandidate(query: string, project: PublicProject) {
     result: {
       type: "project" as const,
       title: project.title,
-      summary: excerpt(project.summary, project.bodyMarkdown),
+      summary: excerpt(project.summary, project.bodyMarkdown, query),
       href: publicProjectPath(project.slug),
-      section: "Work" as const,
+      section: "Engineering" as const,
       publishedAt: project.publishedAt,
+      kind: "Project" as const,
     },
   };
 }
@@ -205,9 +173,11 @@ export async function searchPublicContent(
     dependencies.getEntries(),
     dependencies.getProjects(),
   ]);
+  const graph = await dependencies.getGraph?.(projects, entries);
+  const topics = graph ? linkedSearchTopics(graph) : new Map<string, string>();
   const candidates = [
-    ...entries.map((entry) => entryCandidate(parsed.query, entry)),
-    ...projects.map((project) => projectCandidate(parsed.query, project)),
+    ...entries.map((entry) => entryCandidate(parsed.query, entry, topics.get(publicEntryPath(entry.section, entry.slug)))),
+    ...projects.map((project) => projectCandidate(parsed.query, project, topics.get(publicProjectPath(project.slug)))),
   ].filter((candidate): candidate is NonNullable<typeof candidate> =>
     Boolean(candidate)
   );
@@ -221,4 +191,17 @@ export async function searchPublicContent(
     ...parsed,
     results: candidates.map((candidate) => candidate.result),
   };
+}
+
+export function linkedSearchTopics(graph: PublicGraphData) {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const topics = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    for (const [content, topic] of [[nodes.get(edge.s), nodes.get(edge.t)], [nodes.get(edge.t), nodes.get(edge.s)]]) {
+      if (content?.href && topic?.type === "concept") {
+        topics.set(content.href, [...(topics.get(content.href) ?? []), topic.label]);
+      }
+    }
+  }
+  return new Map([...topics].map(([href, labels]) => [href, labels.join(" ")]));
 }

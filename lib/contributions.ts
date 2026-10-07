@@ -11,6 +11,7 @@ export type Contribution = {
   date: string;
   status: ContributionStatus;
   writeup?: string;
+  homepageTitle?: string;
 };
 
 const dataFile = path.join(process.cwd(), "data", "contributions.json");

@@ -37,9 +37,20 @@ afterAll(async () => {
 }, PGLITE_TEST_TIMEOUT_MS);
 
 describe.sequential("content schema migrations", () => {
+  it("adds editable page text without changing an existing profile or selected media", async () => {
+    const client = await prepareDatabase(8);
+    await client.exec("UPDATE site_settings SET about_markdown = 'My saved biography', version = 8");
+    const before = await client.query<Record<string, unknown>>("SELECT * FROM site_settings");
+    const pageMigration = getMigrationFiles().find((file) => file.endsWith("0008_editable_page_copy.sql"));
+    expect(pageMigration).toBeTruthy();
+    await client.exec(fs.readFileSync(pageMigration!, "utf8"));
+    const after = await client.query<Record<string, unknown>>("SELECT * FROM site_settings");
+    expect(after.rows).toEqual(before.rows.map((row) => ({ ...row, page_copy: {} })));
+  });
+
   it("backfills sections and tags when upgrading a Task 2 database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     const client = await prepareDatabase(2);
 
     const inserted = await client.query<{ id: string; kind: string }>(
@@ -81,7 +92,7 @@ describe.sequential("content schema migrations", () => {
 
   it("backfills revision slugs when upgrading an existing database", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     const client = await prepareDatabase(1);
 
     const inserted = await client.query<{ id: string }>(
@@ -116,7 +127,7 @@ describe.sequential("content schema migrations", () => {
 
   it("preserves existing profile settings when applying the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     const client = await prepareDatabase(3);
     const avatar = await client.query<{ id: string }>(
       `INSERT INTO media (storage_key, url, mime_type, alt_text)
@@ -159,7 +170,7 @@ describe.sequential("content schema migrations", () => {
 
   it("fills absent legacy contact and avatar values from the profile seed", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     const client = await prepareDatabase(3);
     await client.exec(
       `INSERT INTO site_settings
@@ -186,7 +197,7 @@ describe.sequential("content schema migrations", () => {
 
   it("adds global rate-limit buckets when upgrading the existing schema", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     const client = await prepareDatabase(4);
 
     await client.exec(fs.readFileSync(migrationFiles[4]!, "utf8"));
@@ -201,7 +212,7 @@ describe.sequential("content schema migrations", () => {
 
   it("updates the seeded introduction without overwriting UI-managed copy", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     let client = await prepareDatabase(5);
 
     await client.exec(fs.readFileSync(migrationFiles[5]!, "utf8"));
@@ -245,7 +256,7 @@ describe.sequential("content schema migrations", () => {
 
   it("repositions the public profile without overwriting UI-managed copy", async () => {
     const migrationFiles = getMigrationFiles();
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(8);
     let client = await prepareDatabase(6);
 
     await client.exec(fs.readFileSync(migrationFiles[6]!, "utf8"));

@@ -1,7 +1,7 @@
 import type { PublicProfile } from "./public-profile";
 import { DEFAULT_PUBLIC_PROFILE } from "./public-profile";
 
-export const siteUrl = "https://pablopupo.com";
+export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pablopupo.com";
 export const siteTitle = DEFAULT_PUBLIC_PROFILE.siteTitle;
 
 export function absoluteSiteUrl(path: string) {
@@ -17,7 +17,7 @@ export function publicEntryPath(
 }
 
 export function publicProjectPath(slug: string) {
-  return `/work#${slug}`;
+  return slug === "accordo" ? "/accordo" : `/work/${encodeURIComponent(slug)}`;
 }
 
 export function serializeJsonLd(value: unknown) {

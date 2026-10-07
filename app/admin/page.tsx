@@ -3,7 +3,7 @@ import Editor from "./editor";
 import { loadAdminRouteState } from "./admin-route";
 
 export const metadata: Metadata = {
-  title: "Admin",
+  title: "Studio",
   robots: { index: false, follow: false },
 };
 

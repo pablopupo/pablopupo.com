@@ -1,3 +1,4 @@
+import { collectSeries, seriesPath } from "@/lib/series";
 import type { MetadataRoute } from "next";
 import {
   getPublicEntries,
@@ -6,6 +7,7 @@ import {
 import {
   absoluteSiteUrl,
   publicEntryPath,
+  publicProjectPath,
   siteUrl,
 } from "@/lib/site";
 
@@ -49,6 +51,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...(latestMusic ? { lastModified: latestMusic } : {}),
     },
     { url: absoluteSiteUrl("/about") },
+    { url: absoluteSiteUrl("/work/notes") },
+    { url: absoluteSiteUrl("/work/contributions") },
+    { url: absoluteSiteUrl("/accordo") },
     { url: absoluteSiteUrl("/resume") },
   ];
   const entryPages: MetadataRoute.Sitemap = entries.map((entry) => ({
@@ -58,5 +63,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(entry.publishedAt),
   }));
 
-  return [...pages, ...entryPages];
+  const projectPages = projects.filter((project) => project.slug !== "accordo").map((project) => ({
+    url: absoluteSiteUrl(publicProjectPath(project.slug)),
+    lastModified: new Date(project.publishedAt),
+  }));
+  const seriesPages = collectSeries(entries).map((series) => ({
+    url: absoluteSiteUrl(seriesPath(series)), lastModified: newestPublication(series.entries),
+  }));
+  return [...pages, ...entryPages, ...projectPages, ...seriesPages];
 }

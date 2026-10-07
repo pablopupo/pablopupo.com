@@ -12,6 +12,8 @@ import {
   youtubeVideoIdPattern,
 } from "@/lib/markdown/youtube";
 import CodeBlock from "./code-block";
+import ContentLink from "./content-link";
+import { externalLinkProps } from "@/lib/links";
 
 type MarkdownNode = {
   type: string;
@@ -126,9 +128,9 @@ function textWithWikilinks(
     const label = (match[2] || target).trim();
     const slug = target.toLowerCase().replace(/\s+/g, "-");
     parts.push(
-      <a key={`${key}-${match.index}`} href={`/writing/${slug}`}>
+      <ContentLink key={`${key}-${match.index}`} href={`/writing/${slug}`}>
         {label}
-      </a>
+      </ContentLink>
     );
     cursor = match.index + match[0].length;
   }
@@ -267,9 +269,9 @@ function renderNode(
     case "link": {
       const href = node.url ? safeLinkUrl(node.url) : null;
       return href ? (
-        <a key={key} href={href} title={node.title ?? undefined}>
+        <ContentLink key={key} href={href} {...externalLinkProps(href)} title={node.title ?? undefined}>
           {children(node, key, context)}
-        </a>
+        </ContentLink>
       ) : (
         <span key={key}>{children(node, key, context)}</span>
       );
@@ -295,9 +297,9 @@ function renderNode(
         : undefined;
       const href = definition ? safeLinkUrl(definition.url) : null;
       return href ? (
-        <a key={key} href={href} title={definition?.title ?? undefined}>
+        <ContentLink key={key} href={href} {...externalLinkProps(href)} title={definition?.title ?? undefined}>
           {children(node, key, context)}
-        </a>
+        </ContentLink>
       ) : (
         <span key={key}>{children(node, key, context)}</span>
       );

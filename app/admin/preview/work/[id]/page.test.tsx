@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
+  usePathname: () => "/admin/preview/work/test-project",
 }));
 
 vi.mock("@/app/admin/admin-route", () => ({

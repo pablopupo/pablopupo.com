@@ -1,3 +1,4 @@
+import { seriesNeighbors } from "@/lib/series";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicEntryPage } from "@/components/public-entry-page";
@@ -34,5 +35,5 @@ export default async function PostPage({
   if (!entry || entry.section !== "writing") notFound();
   const neighbors = entryNeighbors(entries, entry);
 
-  return <PublicEntryPage entry={entry} {...neighbors} />;
+  return <PublicEntryPage entry={entry} {...neighbors} seriesNavigation={seriesNeighbors(entries, entry)} />;
 }

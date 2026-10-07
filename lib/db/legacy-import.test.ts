@@ -75,8 +75,9 @@ Portable body`,
   it("loads the curated public projects in editorial order", () => {
     const content = loadLegacyContent(process.cwd());
 
-    expect(content.entries).toHaveLength(2);
-    expect(content.entries.every((entry) => entry.status === "draft")).toBe(true);
+    expect(content.entries).toHaveLength(6);
+    expect(content.entries.filter((entry) => entry.kind === "essay" && entry.status === "published").map((entry) => entry.slug)).toEqual(["why-im-building-accordo"]);
+    expect(content.entries.filter((entry) => entry.kind === "performance")).toHaveLength(3);
     expect(content.contributions).toHaveLength(24);
     expect(content.graphNodes).toHaveLength(10);
     expect(content.graphEdges).toHaveLength(9);
@@ -157,7 +158,7 @@ describe("legacy content import", () => {
 
     expect(second).toEqual(first);
     expect(first).toEqual({
-      entries: 2,
+      entries: 6,
       projects: 4,
       contributions: 24,
       graphNodes: 10,
@@ -179,7 +180,7 @@ describe("legacy content import", () => {
          (SELECT COUNT(*)::int FROM knowledge_graph_edges) AS graph_edges`
     );
     expect(counts.rows[0]).toEqual({
-      entries: 2,
+      entries: 6,
       projects: 4,
       contributions: 24,
       graph_nodes: 11,
@@ -222,7 +223,7 @@ describe("legacy content import", () => {
     const posts = await client.query<{ slug: string; status: string; title: string }>(
       `SELECT slug, status, title FROM entries ORDER BY slug`
     );
-    expect(posts.rows).toEqual([
+    expect(posts.rows.filter((entry) => entry.status === "draft")).toEqual([
       {
         slug: "how-this-site-publishes",
         status: "draft",
@@ -234,5 +235,16 @@ describe("legacy content import", () => {
         title: "Composing tool calls and response schemas in vLLM",
       },
     ]);
+    const performances = await database.select().from(schema.entryMusicDetails);
+    expect(performances).toHaveLength(3);
+    expect(performances.map((performance) => performance.youtubeUrl)).toEqual(
+      expect.arrayContaining([
+        "https://www.youtube.com/watch?v=x1hzJP3AuD0",
+        "https://www.youtube.com/watch?v=VY-dT_VrC-w",
+        "https://www.youtube.com/watch?v=IuMpN22O-Ac",
+      ])
+    );
+    expect(performances.find((performance) => performance.youtubeUrl.includes("VY-dT_VrC-w"))).toMatchObject({ performedAt: new Date("2023-11-30T00:00:00.000Z"), venue: "UF School of Music, Piano Recital" });
+    expect(performances.filter((performance) => !performance.youtubeUrl.includes("VY-dT_VrC-w")).every((performance) => performance.performedAt === null)).toBe(true);
   });
 }, PGLITE_TEST_TIMEOUT_MS);
